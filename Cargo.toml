@@ -1,0 +1,3 @@
+[workspace]
+members = ["omni-rs", "omni-rs-macros"]
+resolver = "2"
