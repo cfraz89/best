@@ -186,6 +186,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "elementary-rs-lib",
+ "elementary-rs-macros",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "tokio",
+ "tracing-subscriber",
+ "web-sys",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -216,6 +231,26 @@ name = "ego-tree"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a68a4904193147e0a8dec3314640e6db742afd5f6e634f428a6af230d9b3591"
+
+[[package]]
+name = "elementary-rs-lib"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
+name = "elementary-rs-macros"
+version = "0.1.0"
+dependencies = [
+ "elementary-rs-lib",
+ "proc-macro2",
+ "quote",
+ "scraper",
+ "syn 2.0.48",
+ "thiserror",
+]
 
 [[package]]
 name = "equivalent"
@@ -597,29 +632,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "omni-rs"
-version = "0.1.0"
-dependencies = [
- "axum",
- "omni-rs-macros",
- "serde",
- "tokio",
- "tracing-subscriber",
- "web-sys",
-]
-
-[[package]]
-name = "omni-rs-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "scraper",
- "syn 2.0.48",
- "thiserror",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -786,9 +798,9 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.76"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fc56cda0b5c3325f5fbbd7ff9fda9e02bb00bb3dac51252d2f1bfa1cb8cc8c"
+checksum = "e2422ad645d89c99f8f3e6b88a9fdeca7fabeac836b1002371c4367c8f984aae"
 dependencies = [
  "unicode-ident",
 ]

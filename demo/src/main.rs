@@ -1,15 +1,15 @@
 #![recursion_limit = "512"]
-mod component;
 
-use std::{collections::HashMap, iter::Map, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use axum::{
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
-use component::{Component, Element, ElementChild, HtmlElement, Renderable};
-use omni_rs_macros::component;
+use elementary_rs_lib::node::{Component, HtmlElement, Node};
+use elementary_rs_macros::{component, render_node};
+use quote::{quote, ToTokens};
 use serde::{Deserialize, Serialize};
 
 #[tokio::main]
@@ -31,29 +31,36 @@ async fn main() {
 
 // basic handler that responds with a static string
 async fn root() -> String {
-    Element::Html(HtmlElement {
-        tag: "div",
-        attributes: HashMap::new(),
-        child: Arc::new(ElementChild::Elements(vec![Element::Component(Box::new(
-            MyH1 {
-                child: Arc::new(ElementChild::Text("Hello, world!".to_string())),
-            },
-        ))])),
-    })
-    .render()
+    render_node!(
+        <div>
+            <my-h1>
+                Hello, world!
+            </my-h1>
+        </div>
+    )
 }
 
 #[component(tag = "my-h1")]
-struct MyH1<'a> {
-    child: Arc<ElementChild<'a>>,
+struct MyH1 {
+    child_nodes: Arc<Vec<Node>>,
 }
 
-impl<'a> Component for MyH1<'a> {
-    fn template(&self) -> Element {
-        Element::Html(HtmlElement {
-            tag: "h1",
+impl Component for MyH1 {
+    fn node(&self) -> Node {
+        Node::HtmlElement(HtmlElement {
+            tag: "h1".to_string(),
             attributes: HashMap::new(),
-            child: self.child.clone(),
+            child_nodes: self.child_nodes.clone(),
+        })
+    }
+}
+
+impl ToTokens for MyH1 {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.extend(quote! {
+            MyH1 {
+                child_nodes: Arc::new(vec![])
+            }
         })
     }
 }
