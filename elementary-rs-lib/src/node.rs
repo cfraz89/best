@@ -14,7 +14,7 @@ pub struct HtmlElement {
     pub child_nodes: Arc<Vec<Node>>,
 }
 
-pub trait Component: ToTokens {
+pub trait Component {
     fn node(&self) -> Node;
 }
 
@@ -49,36 +49,5 @@ impl Renderable for Node {
                 .expect("couldn't write children"),
         }
         res
-    }
-}
-
-impl ToTokens for Node {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        {
-            tokens.extend(match self {
-                Node::HtmlElement(HtmlElement {
-                    tag,
-                    attributes,
-                    child_nodes,
-                }) => {
-                    let stream = TokenStream::new();
-                    quote! {
-                    elementary_rs_lib::node::Node::HtmlElement(elementary_rs_lib::node::HtmlElement {
-                        tag: #tag.to_string(),
-                        attributes: Default::default(),
-                        child_nodes: Arc::new(vec![#(#child_nodes),*]),
-                    })
-                }
-                }
-                Node::Text(text) => quote! {
-                    elementary_rs_lib::node::Node::Text(#text.to_string())
-                }
-                .into(),
-                Node::Component(component) => quote! {
-                    elementary_rs_node::node::Node::Component(Box::new(#component))
-                }
-                .into(),
-            })
-        }
     }
 }

@@ -7,8 +7,8 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use elementary_rs_lib::node::{Component, HtmlElement, Node};
-use elementary_rs_macros::{component, render_node};
+use elementary_rs_lib::node::{self, Component, HtmlElement, Node};
+use elementary_rs_macros::{node, render_node, Component};
 use quote::{quote, ToTokens};
 use serde::{Deserialize, Serialize};
 
@@ -33,13 +33,14 @@ async fn main() {
 async fn root() -> String {
     render_node!(
         <div>
-            <my-h1>
+            <MyH1>
                 Hello, world!
-            </my-h1>
+            </MyH1>
         </div>
     )
 }
 
+#[derive(Component)]
 #[component(tag = "my-h1")]
 struct MyH1 {
     child_nodes: Arc<Vec<Node>>,
@@ -47,21 +48,13 @@ struct MyH1 {
 
 impl Component for MyH1 {
     fn node(&self) -> Node {
-        Node::HtmlElement(HtmlElement {
-            tag: "h1".to_string(),
-            attributes: HashMap::new(),
-            child_nodes: self.child_nodes.clone(),
-        })
-    }
-}
-
-impl ToTokens for MyH1 {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.extend(quote! {
-            MyH1 {
-                child_nodes: Arc::new(vec![])
-            }
-        })
+        node! {
+            <h1>
+                #for child_node in self.child_nodes.iter() {
+                    #child_node
+                }
+            </h1>
+        }
     }
 }
 

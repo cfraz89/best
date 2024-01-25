@@ -1,54 +1,54 @@
 #![feature(proc_macro_span)]
 #![feature(proc_macro_diagnostic)]
-use std::iter::Peekable;
+#![feature(lazy_cell)]
+mod node;
 
-use elementary_rs_lib::node::{HtmlElement, Node};
+use std::{
+    collections::HashMap,
+    iter::Peekable,
+    sync::{Arc, LazyLock, Mutex},
+};
+
+use node::{HtmlElement, TemplateNode};
 use proc_macro::{token_stream::IntoIter, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
-use syn::{self, meta::ParseNestedMeta, parse::Parse, parse_macro_input, LitStr};
+use syn::{self, meta::ParseNestedMeta, parse_macro_input, DeriveInput, LitStr};
 
-// ----- #(component(name)) attribute macro -----
-#[derive(Debug)]
-struct ComponentAttributes {
-    tag: String,
-}
+static REGISTERED_COMPONENTS: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
-impl ComponentAttributes {
-    fn parse(&mut self, meta: ParseNestedMeta) -> syn::Result<()> {
-        if meta.path.is_ident("tag") {
-            self.tag = meta.value()?.parse::<LitStr>()?.value();
-            Ok(())
-        } else {
-            unimplemented!()
+#[proc_macro_derive(Component, attributes(component))]
+pub fn derive_component(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as DeriveInput);
+    let mut tag = Option::None;
+    input.attrs.iter().for_each(|attr| {
+        if attr.path().is_ident("component") {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("tag") {
+                    tag = Some(meta.value()?.parse::<LitStr>()?.value());
+                    return Ok(());
+                }
+                Err(meta.error("expected `tag` or `tag = \"...\"`"))
+            })
+            .unwrap();
         }
-    }
+    });
+    let ident = input.ident.to_string();
+    let final_tag = tag.unwrap_or(ident.clone());
+    REGISTERED_COMPONENTS
+        .lock()
+        .unwrap()
+        .insert(final_tag.clone(), ident.clone());
+    println!(
+        "Registered component: {:?} -> {:?}",
+        final_tag,
+        ident.clone()
+    );
+
+    // println!("{:?}", input);
+    TokenStream::new()
 }
-
-#[proc_macro_attribute]
-pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
-    // Parse the list of variables the user wanted to print.
-    // let mut args = parse_macro_input!(attr as ComponentAttributes);
-    let mut component_attributes = ComponentAttributes {
-        tag: String::from(""),
-    };
-    let component_parser = syn::meta::parser(|meta| component_attributes.parse(meta));
-    parse_macro_input!(attr with component_parser);
-
-    item
-}
-// -----------
-
-// ----- element! proc macro -----
-
-// enum Node {
-//     HtmlElement(HtmlElement),
-//     Text(String),
-// }
-
-// struct HtmlElement {
-//     tag: String,
-//     children: Vec<Node>,
-// }
 
 #[derive(thiserror::Error, Debug)]
 enum ParseError {
@@ -145,12 +145,15 @@ fn parse_tag_name(iter: &mut Peekable<IntoIter>) -> Result<String, ParseError> {
     }
 }
 
-/// Parse a html-like template into a Node
+/// Parse a html-like template into a TemplateNode. Then emit its token stream, which will generate a Node
 #[proc_macro]
 pub fn node(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
     match parse_node(iter) {
-        Ok(node) => node.to_token_stream().into(),
+        Ok(node) => {
+            println!("{:?}", node);
+            node.to_token_stream().into()
+        }
         Err(ParseError::EndOfInput { expected }) => {
             panic!("Unexpected end of input, expected {}", expected)
         }
@@ -173,7 +176,7 @@ pub fn node(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Parse a html-like template, then render it out to a string
+/// Parse a html-like template macro template, which when generated will render it out to a string
 #[proc_macro]
 pub fn render_node(input: TokenStream) -> TokenStream {
     let stream: proc_macro2::TokenStream = node(input).into();
@@ -185,7 +188,8 @@ pub fn render_node(input: TokenStream) -> TokenStream {
     .into()
 }
 
-fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<Node, ParseError> {
+/// Parse a html-like macro template into a TemplateNode
+fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError> {
     let mut text = Option::<String>::None;
     while parse_punct(&peek_token(iter, "text".to_string())?, '<').is_err() {
         let token = iter.next().ok_or(ParseError::EndOfInput {
@@ -198,14 +202,25 @@ fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<Node, ParseError> {
         }
     }
     if let Some(t) = text {
-        Ok(Node::Text(t))
+        Ok(TemplateNode::Text(t))
     } else {
-        let element = parse_html_element(iter)?;
-        Ok(Node::HtmlElement(element))
+        Ok(match parse_element(iter)? {
+            Element::Html(html_element) => TemplateNode::HtmlElement(html_element),
+            Element::Component(component_element) => {
+                TemplateNode::ComponentElement(component_element)
+            }
+        })
     }
 }
 
-fn parse_html_element(iter: &mut Peekable<IntoIter>) -> Result<HtmlElement, ParseError> {
+enum Element {
+    Html(node::HtmlElement),
+    Component(node::ComponentElement),
+}
+
+/// Parse an element tag, which may be a html element or a custom element
+/// If its a custom element, we just keep the raw tokens for each attribute
+fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     //Parse opening tag opening bracket
     parse_punct(&take_token(iter, '<'.to_string())?, '<')?;
     //Parse tag name
@@ -213,7 +228,7 @@ fn parse_html_element(iter: &mut Peekable<IntoIter>) -> Result<HtmlElement, Pars
     //Parse opening tag closing bracket
     parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
     //Parse child if it exists
-    let mut child_nodes = Vec::<Node>::new();
+    let mut child_nodes = Vec::<TemplateNode>::new();
 
     while peek_end_tag(iter).is_err() {
         let node = parse_node(iter)?;
@@ -236,9 +251,22 @@ fn parse_html_element(iter: &mut Peekable<IntoIter>) -> Result<HtmlElement, Pars
     //Parse closing tag closing bracket
     parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
 
-    Ok(HtmlElement {
-        tag: tag.into(),
-        child_nodes: child_nodes.into(),
-        attributes: Default::default(),
-    })
+    if tag.chars().next().unwrap().is_uppercase() {
+        Ok(Element::Component(node::ComponentElement {
+            name: tag,
+            //TODO convert the token stream into the hashmap
+            properties: HashMap::from([(
+                syn::Ident::new("child_nodes", proc_macro2::Span::call_site()),
+                quote! {
+                    Arc::new(vec![#(#child_nodes),*])
+                },
+            )]),
+        }))
+    } else {
+        Ok(Element::Html(node::HtmlElement {
+            tag,
+            attributes: HashMap::new(),
+            child_nodes: Arc::new(child_nodes),
+        }))
+    }
 }
