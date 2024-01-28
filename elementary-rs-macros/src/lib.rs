@@ -17,13 +17,13 @@ use syn::{self, meta::ParseNestedMeta, parse_macro_input, DeriveInput, LitStr};
 static REGISTERED_COMPONENTS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-#[proc_macro_derive(Component, attributes(component))]
+#[proc_macro_derive(CustomElement, attributes(custom_element))]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
     let mut tag = Option::None;
     input.attrs.iter().for_each(|attr| {
-        if attr.path().is_ident("component") {
+        if attr.path().is_ident("custom_element") {
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("tag") {
                     tag = Some(meta.value()?.parse::<LitStr>()?.value());
@@ -34,12 +34,13 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
             .unwrap();
         }
     });
-    let ident = input.ident.to_string();
-    let final_tag = tag.unwrap_or(ident.clone());
+    let ident = input.ident;
+    let ident_string = format!("component-{}", ident.to_string().to_ascii_lowercase());
+    let final_tag = tag.unwrap_or(ident.to_string());
     REGISTERED_COMPONENTS
         .lock()
         .unwrap()
-        .insert(final_tag.clone(), ident.clone());
+        .insert(final_tag.clone(), ident.to_string());
     println!(
         "Registered component: {:?} -> {:?}",
         final_tag,
@@ -47,7 +48,14 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     );
 
     // println!("{:?}", input);
-    TokenStream::new()
+    quote! {
+        impl elementary_rs_lib::node::CustomElement for #ident {
+            fn tag(&self) -> &'static str {
+                #ident_string
+            }
+        }
+    }
+    .into()
 }
 
 #[derive(thiserror::Error, Debug)]

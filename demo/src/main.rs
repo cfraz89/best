@@ -3,14 +3,17 @@
 use std::{collections::HashMap, sync::Arc};
 
 use axum::{
-    http::StatusCode,
+    body::Body,
+    http::{Response, StatusCode},
+    response::{Html, IntoResponse},
     routing::{get, post},
     Json, Router,
 };
-use elementary_rs_lib::node::{self, Component, HtmlElement, Node};
-use elementary_rs_macros::{node, render_node, Component};
+use elementary_rs_lib::node::{self, Component, HtmlElement, Node, Renderable};
+use elementary_rs_macros::{node, render_node, CustomElement};
 use quote::{quote, ToTokens};
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 
 #[tokio::main]
 async fn main() {
@@ -29,19 +32,37 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
+struct AxumNode(Node);
+
+impl From<Node> for AxumNode {
+    fn from(node: Node) -> Self {
+        Self(node)
+    }
+}
+
+impl IntoResponse for AxumNode {
+    fn into_response(self) -> Response<Body> {
+        let mut output = String::new();
+        write!(&mut output, "<html><body>{}</body></html>", self.0.render())
+            .expect("couldn't write");
+        Html(output).into_response()
+    }
+}
+
 // basic handler that responds with a static string
-async fn root() -> String {
-    render_node!(
+async fn root() -> AxumNode {
+    node!(
         <div>
             <MyH1>
                 Hello, world!
             </MyH1>
         </div>
     )
+    .into()
 }
 
-#[derive(Component)]
-#[component(tag = "my-h1")]
+#[derive(CustomElement)]
+#[custom_element(tag = "my-h1")]
 struct MyH1 {
     child_nodes: Arc<Vec<Node>>,
 }

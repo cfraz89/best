@@ -14,8 +14,12 @@ pub struct HtmlElement {
     pub child_nodes: Arc<Vec<Node>>,
 }
 
-pub trait Component {
+pub trait Component: CustomElement {
     fn node(&self) -> Node;
+}
+
+pub trait CustomElement {
+    fn tag(&self) -> &'static str;
 }
 
 pub trait Renderable {
@@ -44,9 +48,14 @@ impl Renderable for Node {
                 }
                 write!(str, "</{}>", tag).expect("couldn't write closing tag");
             }
-            Node::Component(component) => str
-                .write_str(&component.node().render())
-                .expect("couldn't write children"),
+            Node::Component(component) => write!(
+                str,
+                "<{}><template shadowrootmode=\"open\">{}</template></{}>",
+                component.tag(),
+                component.node().render(),
+                component.tag()
+            )
+            .expect("couldn't write component"),
         }
         res
     }
