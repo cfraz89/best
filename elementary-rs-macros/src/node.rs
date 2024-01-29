@@ -14,6 +14,7 @@ pub enum TemplateNode {
         element: ComponentElement,
         child_nodes: Arc<Vec<TemplateNode>>,
     },
+    Expression(TokenStream),
 }
 
 #[derive(Debug)]
@@ -72,6 +73,9 @@ impl ToTokens for TemplateNode {
                     }
                     .into()
                 }
+                TemplateNode::Expression(tokens) => quote! {
+                    elementary_rs_lib::node::Node::Expression(Box::new(|| (#tokens).to_string()))
+                },
             })
         }
     }

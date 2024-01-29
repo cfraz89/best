@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Write, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Write},
+    sync::Arc,
+};
 
 pub enum Node {
     Text(String),
@@ -10,6 +14,7 @@ pub enum Node {
         element: Box<dyn Component>,
         child_nodes: Arc<Vec<Node>>,
     },
+    Expression(Box<dyn Fn() -> String>),
 }
 
 pub struct HtmlElement {
@@ -25,16 +30,10 @@ pub trait CustomElement {
     fn tag(&self) -> &'static str;
 }
 
-pub trait Renderable {
-    fn render(&self) -> String;
-}
-
-impl Renderable for Node {
-    fn render(&self) -> String {
-        let mut res = String::new();
-        let str = &mut res;
+impl Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Node::Text(string) => write!(str, "{}", string).expect("couldn't write text"),
+            Node::Text(string) => write!(f, "{}", string),
             Node::HtmlElement {
                 element: HtmlElement { tag, attributes },
                 child_nodes,
@@ -44,34 +43,36 @@ impl Renderable for Node {
                     .map(|(k, v)| format!(" {}=\"{}\"", k, v))
                     .collect::<Vec<String>>()
                     .join(" ");
-                write!(str, "<{}{}", tag, attributes_string).expect("couldn't write opening tag");
+                write!(f, "<{}{}", tag, attributes_string)?;
                 if child_nodes.is_empty() {
-                    write!(str, " />").expect("couldn't write self-closing tag");
+                    write!(f, " />");
                 } else {
-                    write!(str, ">").expect("couldn't write closing tag");
+                    write!(f, ">")?;
                     for child in child_nodes.iter() {
-                        str.write_str(&child.render()).expect("couldn't child");
+                        child.fmt(f)?;
                     }
-                    write!(str, "</{}>", tag).expect("couldn't write closing tag");
+                    write!(f, "</{}>", tag)?;
                 }
+                Ok(())
             }
             Node::Component {
                 element,
                 child_nodes,
-            } => write!(
-                str,
-                "<{}><template shadowrootmode=\"open\">{}</template>{}</{}>",
-                element.tag(),
-                element.node().render(),
-                child_nodes
-                    .iter()
-                    .map(|child| child.render())
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-                element.tag()
-            )
-            .expect("couldn't write component"),
+            } => {
+                let mut children_str = String::new();
+                for child in child_nodes.iter() {
+                    write!(children_str, "{}", child)?;
+                }
+                write!(
+                    f,
+                    "<{}><template shadowrootmode=\"open\">{}</template>{}</{}>",
+                    element.tag(),
+                    element.node(),
+                    children_str,
+                    element.tag()
+                )
+            }
+            Node::Expression(exp_fn) => write!(f, "{}", exp_fn()),
         }
-        res
     }
 }

@@ -233,10 +233,21 @@ pub fn render_node(input: TokenStream) -> TokenStream {
 /// Parse a html-like macro template into a TemplateNode
 fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError> {
     let mut text = Option::<String>::None;
-    while parse_punct(&peek_token(iter, "text".to_string())?, '<').is_err() {
-        let token = iter.next().ok_or(ParseError::EndOfInput {
-            expected: "text".to_string(),
-        })?;
+    //Treat it as a text node until we hit a '<' or '{'
+    let mut token: TokenTree;
+    loop {
+        token = peek_token(iter, "text".to_string())?;
+        match &token {
+            TokenTree::Punct(p) if p.as_char() == '<' => {
+                break;
+            }
+            TokenTree::Group(g) if g.delimiter() == proc_macro::Delimiter::Brace => {
+                take_token(iter, "group".to_string())?;
+                return Ok(TemplateNode::Expression(g.stream().into()));
+            }
+            _ => {}
+        }
+        let token = take_token(iter, "text".to_string())?;
         if let Some(ref mut t) = text {
             t.push_str(&token.to_string());
         } else {
@@ -284,7 +295,7 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     //Parse tag name
     let tag = parse_tag_name(iter)?;
 
-    if (peek_self_close_tag(iter).is_ok()) {
+    if peek_self_close_tag(iter).is_ok() {
         parse_self_close_tag(iter)?;
         return get_element(tag, Arc::new(Vec::new()));
     }

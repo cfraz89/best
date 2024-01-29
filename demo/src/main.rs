@@ -9,9 +9,8 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use elementary_rs_lib::node::{self, Component, HtmlElement, Node, Renderable};
-use elementary_rs_macros::{node, render_node, CustomElement};
-use quote::{quote, ToTokens};
+use elementary_rs_lib::node::{Component, Node};
+use elementary_rs_macros::{node, CustomElement};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 
@@ -46,19 +45,20 @@ impl IntoResponse for Document {
         write!(
             &mut output,
             "<!doctype html><html><body>{}</body></html>",
-            self.0.render()
+            self.0
         )
         .expect("couldn't write");
         Html(output).into_response()
     }
 }
 
+const x: i32 = 10;
 // basic handler that responds with a static string
 async fn root() -> Document {
     node!(
         <div>
             <MyH1>
-                Hello, world!
+                {x * 10}
             </MyH1>
         </div>
     )
