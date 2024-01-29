@@ -9,10 +9,10 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-use node::{HtmlElement, TemplateNode};
+use node::TemplateNode;
 use proc_macro::{token_stream::IntoIter, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
-use syn::{self, meta::ParseNestedMeta, parse_macro_input, DeriveInput, LitStr};
+use syn::{self, parse_macro_input, DeriveInput, LitStr};
 
 static REGISTERED_COMPONENTS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -213,17 +213,33 @@ fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError>
         Ok(TemplateNode::Text(t))
     } else {
         Ok(match parse_element(iter)? {
-            Element::Html(html_element) => TemplateNode::HtmlElement(html_element),
-            Element::Component(component_element) => {
-                TemplateNode::ComponentElement(component_element)
-            }
+            Element::Html {
+                element,
+                child_nodes,
+            } => TemplateNode::HtmlElement {
+                element,
+                child_nodes,
+            },
+            Element::Component {
+                element,
+                child_nodes,
+            } => TemplateNode::ComponentElement {
+                element,
+                child_nodes,
+            },
         })
     }
 }
 
 enum Element {
-    Html(node::HtmlElement),
-    Component(node::ComponentElement),
+    Html {
+        element: node::HtmlElement,
+        child_nodes: Arc<Vec<TemplateNode>>,
+    },
+    Component {
+        element: node::ComponentElement,
+        child_nodes: Arc<Vec<TemplateNode>>,
+    },
 }
 
 /// Parse an element tag, which may be a html element or a custom element
@@ -259,22 +275,23 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     //Parse closing tag closing bracket
     parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
 
+    //If its an uppercase tag, its a custom element
     if tag.chars().next().unwrap().is_uppercase() {
-        Ok(Element::Component(node::ComponentElement {
-            name: tag,
-            //TODO convert the token stream into the hashmap
-            properties: HashMap::from([(
-                syn::Ident::new("child_nodes", proc_macro2::Span::call_site()),
-                quote! {
-                    Arc::new(vec![#(#child_nodes),*])
-                },
-            )]),
-        }))
-    } else {
-        Ok(Element::Html(node::HtmlElement {
-            tag,
-            attributes: HashMap::new(),
+        Ok(Element::Component {
+            element: node::ComponentElement {
+                name: tag,
+                //TODO convert the token stream into the hashmap
+                properties: HashMap::new(),
+            },
             child_nodes: Arc::new(child_nodes),
-        }))
+        })
+    } else {
+        Ok(Element::Html {
+            element: node::HtmlElement {
+                tag,
+                attributes: HashMap::new(),
+            },
+            child_nodes: Arc::new(child_nodes),
+        })
     }
 }

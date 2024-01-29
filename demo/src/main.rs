@@ -32,25 +32,29 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-struct AxumNode(Node);
+struct Document(Node);
 
-impl From<Node> for AxumNode {
+impl From<Node> for Document {
     fn from(node: Node) -> Self {
         Self(node)
     }
 }
 
-impl IntoResponse for AxumNode {
+impl IntoResponse for Document {
     fn into_response(self) -> Response<Body> {
         let mut output = String::new();
-        write!(&mut output, "<html><body>{}</body></html>", self.0.render())
-            .expect("couldn't write");
+        write!(
+            &mut output,
+            "<!doctype html><html><body>{}</body></html>",
+            self.0.render()
+        )
+        .expect("couldn't write");
         Html(output).into_response()
     }
 }
 
 // basic handler that responds with a static string
-async fn root() -> AxumNode {
+async fn root() -> Document {
     node!(
         <div>
             <MyH1>
@@ -63,17 +67,13 @@ async fn root() -> AxumNode {
 
 #[derive(CustomElement)]
 #[custom_element(tag = "my-h1")]
-struct MyH1 {
-    child_nodes: Arc<Vec<Node>>,
-}
+struct MyH1 {}
 
 impl Component for MyH1 {
     fn node(&self) -> Node {
         node! {
             <h1>
-                #for child_node in self.child_nodes.iter() {
-                    #child_node
-                }
+            <slot></slot>
             </h1>
         }
     }

@@ -6,8 +6,14 @@ use quote::{format_ident, quote, ToTokens};
 #[derive(Debug)]
 pub enum TemplateNode {
     Text(String),
-    HtmlElement(HtmlElement),
-    ComponentElement(ComponentElement),
+    HtmlElement {
+        element: HtmlElement,
+        child_nodes: Arc<Vec<TemplateNode>>,
+    },
+    ComponentElement {
+        element: ComponentElement,
+        child_nodes: Arc<Vec<TemplateNode>>,
+    },
 }
 
 #[derive(Debug)]
@@ -20,42 +26,53 @@ pub struct ComponentElement {
 pub struct HtmlElement {
     pub tag: String,
     pub attributes: HashMap<String, String>,
-    pub child_nodes: Arc<Vec<TemplateNode>>,
 }
 
 impl ToTokens for TemplateNode {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         {
             tokens.extend(match self {
-                TemplateNode::HtmlElement(HtmlElement {
-                    tag,
-                    attributes,
+                TemplateNode::HtmlElement {
+                    element: HtmlElement { tag, attributes },
                     child_nodes,
-                }) => {
+                } => {
                     quote! {
-                    elementary_rs_lib::node::Node::HtmlElement(elementary_rs_lib::node::HtmlElement {
-                        tag: #tag.to_string(),
-                        attributes: Default::default(),
-                        child_nodes: Arc::new(vec![#(#child_nodes),*]),
-                    })
-                }
+                        elementary_rs_lib::node::Node::HtmlElement {
+                            element: elementary_rs_lib::node::HtmlElement {
+                                tag: #tag.to_string(),
+                                attributes: Default::default(),
+                            },
+                            child_nodes: Arc::new(vec![#(#child_nodes),*])
+                        }
+                    }
                 }
                 TemplateNode::Text(text) => quote! {
                     elementary_rs_lib::node::Node::Text(#text.to_string())
                 }
                 .into(),
-                TemplateNode::ComponentElement(ComponentElement{name,properties}) => {
-                  let name_ident = format_ident!("{}", name);
-                  let properties = properties.iter().map(|(k,v)| {
+                TemplateNode::ComponentElement {
+                    element: ComponentElement { name, properties },
+                    child_nodes,
+                } => {
+                    let name_ident = format_ident!("{}", name);
+                    let properties = properties.iter().map(|(k, v)| {
+                        quote! {
+                        #k: #v
+                        }
+                    });
                     quote! {
-                      #k: #v
+                        elementary_rs_lib::node::Node::Component {
+                            element: Box::new(
+                                #name_ident {
+                                    #(#properties),*
+                                }
+                            ),
+                            child_nodes: Arc::new(vec![#(#child_nodes),*])
+                        }
                     }
-                  });
-                  quote! {
-                    elementary_rs_lib::node::Node::Component(Box::new(#name_ident {
-                        #(#properties),*
-                    }
-                    ))}.into()}})
+                    .into()
+                }
+            })
         }
     }
 }

@@ -1,17 +1,20 @@
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
 use std::{collections::HashMap, fmt::Write, sync::Arc};
 
 pub enum Node {
     Text(String),
-    HtmlElement(HtmlElement),
-    Component(Box<dyn Component>),
+    HtmlElement {
+        element: HtmlElement,
+        child_nodes: Arc<Vec<Node>>,
+    },
+    Component {
+        element: Box<dyn Component>,
+        child_nodes: Arc<Vec<Node>>,
+    },
 }
 
 pub struct HtmlElement {
     pub tag: String,
     pub attributes: HashMap<String, String>,
-    pub child_nodes: Arc<Vec<Node>>,
 }
 
 pub trait Component: CustomElement {
@@ -32,11 +35,10 @@ impl Renderable for Node {
         let str = &mut res;
         match self {
             Node::Text(string) => write!(str, "{}", string).expect("couldn't write text"),
-            Node::HtmlElement(HtmlElement {
-                tag,
-                attributes,
+            Node::HtmlElement {
+                element: HtmlElement { tag, attributes },
                 child_nodes,
-            }) => {
+            } => {
                 let attributes_string = attributes
                     .into_iter()
                     .map(|(k, v)| format!(" {}=\"{}\"", k, v))
@@ -48,12 +50,20 @@ impl Renderable for Node {
                 }
                 write!(str, "</{}>", tag).expect("couldn't write closing tag");
             }
-            Node::Component(component) => write!(
+            Node::Component {
+                element,
+                child_nodes,
+            } => write!(
                 str,
-                "<{}><template shadowrootmode=\"open\">{}</template></{}>",
-                component.tag(),
-                component.node().render(),
-                component.tag()
+                "<{}><template shadowrootmode=\"open\">{}</template>{}</{}>",
+                element.tag(),
+                element.node().render(),
+                child_nodes
+                    .iter()
+                    .map(|child| child.render())
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+                element.tag()
             )
             .expect("couldn't write component"),
         }
