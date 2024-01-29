@@ -73,7 +73,7 @@ impl Component for MyH1 {
     fn node(&self) -> Node {
         node! {
             <h1>
-            <slot></slot>
+            <slot />
             </h1>
         }
     }

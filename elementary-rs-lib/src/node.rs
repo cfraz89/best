@@ -44,11 +44,16 @@ impl Renderable for Node {
                     .map(|(k, v)| format!(" {}=\"{}\"", k, v))
                     .collect::<Vec<String>>()
                     .join(" ");
-                write!(str, "<{}{}>", tag, attributes_string).expect("couldn't write opening tag");
-                for child in child_nodes.iter() {
-                    str.write_str(&child.render()).expect("couldn't child");
+                write!(str, "<{}{}", tag, attributes_string).expect("couldn't write opening tag");
+                if child_nodes.is_empty() {
+                    write!(str, " />").expect("couldn't write self-closing tag");
+                } else {
+                    write!(str, ">").expect("couldn't write closing tag");
+                    for child in child_nodes.iter() {
+                        str.write_str(&child.render()).expect("couldn't child");
+                    }
+                    write!(str, "</{}>", tag).expect("couldn't write closing tag");
                 }
-                write!(str, "</{}>", tag).expect("couldn't write closing tag");
             }
             Node::Component {
                 element,

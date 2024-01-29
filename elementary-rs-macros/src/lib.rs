@@ -10,13 +10,14 @@ use std::{
 };
 
 use node::TemplateNode;
-use proc_macro::{token_stream::IntoIter, Span, TokenStream, TokenTree};
+use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
 use syn::{self, parse_macro_input, DeriveInput, LitStr};
 
 static REGISTERED_COMPONENTS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// Parse a #derive(CustomElement) macro
 #[proc_macro_derive(CustomElement, attributes(custom_element))]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
@@ -47,7 +48,6 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
         ident.clone()
     );
 
-    // println!("{:?}", input);
     quote! {
         impl elementary_rs_lib::node::CustomElement for #ident {
             fn tag(&self) -> &'static str {
@@ -76,16 +76,19 @@ enum ParseError {
     },
 }
 
+/// Take a single token and return failure if it isn't what we expected
 fn take_token(iter: &mut Peekable<IntoIter>, expected: String) -> Result<TokenTree, ParseError> {
     iter.next().ok_or(ParseError::EndOfInput { expected })
 }
 
+/// Peek at a token and return failure if it isn't what we expected
 fn peek_token(iter: &mut Peekable<IntoIter>, expected: String) -> Result<TokenTree, ParseError> {
     iter.peek()
         .ok_or(ParseError::EndOfInput { expected })
         .cloned()
 }
 
+/// Parse a punctuation character and return failure if it isn't what we expected
 fn parse_punct(input: &TokenTree, punct: char) -> Result<(), ParseError> {
     match input {
         TokenTree::Punct(p) => {
@@ -107,6 +110,7 @@ fn parse_punct(input: &TokenTree, punct: char) -> Result<(), ParseError> {
     }
 }
 
+/// Peek at upcoming tokens, return success if its beginning of end tag '</'
 fn peek_end_tag(iter: &mut Peekable<IntoIter>) -> Result<(), ParseError> {
     let cloned_iter = &mut iter.clone();
     parse_punct(&take_token(cloned_iter, '<'.to_string())?, '<')?;
@@ -115,24 +119,54 @@ fn peek_end_tag(iter: &mut Peekable<IntoIter>) -> Result<(), ParseError> {
     Ok(())
 }
 
+/// Peek at upcoming tokens, return success if its self closing tag '/>'
+fn peek_self_close_tag(iter: &mut Peekable<IntoIter>) -> Result<(), ParseError> {
+    let cloned_iter = &mut iter.clone();
+    parse_punct(&take_token(cloned_iter, '/'.to_string())?, '/')?;
+    //Parse closing tag slash
+    parse_punct(&take_token(cloned_iter, '>'.to_string())?, '>')?;
+    Ok(())
+}
+
+/// Parse upcoming tokens, return success if its self closing tag '/>'
+fn parse_self_close_tag(iter: &mut Peekable<IntoIter>) -> Result<(), ParseError> {
+    parse_punct(&take_token(iter, '/'.to_string())?, '/')?;
+    //Parse closing tag slash
+    parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
+    Ok(())
+}
+
+/// Parse a  tag name, which may be a html element or a custom element
 fn parse_tag_name(iter: &mut Peekable<IntoIter>) -> Result<String, ParseError> {
     let mut tag: Option<String> = None;
-    while parse_punct(&peek_token(iter, "tag name".to_string())?, '>').is_err() {
-        let input = take_token(iter, "tag name".to_string())?;
+    let mut joint_to_continue_name = false;
+    loop {
+        let input = peek_token(iter, "tag name".to_string())?;
         match (input, &mut tag) {
             (TokenTree::Ident(i), None) => {
                 tag = Some(i.to_string());
+                joint_to_continue_name = true;
+                take_token(iter, "tag name".to_string())?;
                 Ok(())
             }
             (TokenTree::Ident(i), Some(t)) => {
+                //We got an ident instead of a joint, we've gone past the tag name
+                if joint_to_continue_name {
+                    break;
+                }
                 t.push_str(&i.to_string());
                 Ok(())
             }
-            (TokenTree::Punct(p), Some(t)) if p.as_char() == '-' => {
+            (TokenTree::Punct(p), Some(t))
+                if p.as_char() == '-' && p.spacing() == Spacing::Joint =>
+            {
                 t.push_str("-");
+                joint_to_continue_name = false;
                 Ok(())
             }
-
+            (TokenTree::Punct(p), Some(t)) if p.as_char() == '/' || p.as_char() == '>' => {
+                break;
+            }
             (TokenTree::Punct(p), None) => Err(ParseError::UnexpectedToken {
                 expected: "identifier".to_string(),
                 found: p.to_string(),
@@ -249,6 +283,12 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     parse_punct(&take_token(iter, '<'.to_string())?, '<')?;
     //Parse tag name
     let tag = parse_tag_name(iter)?;
+
+    if (peek_self_close_tag(iter).is_ok()) {
+        parse_self_close_tag(iter)?;
+        return get_element(tag, Arc::new(Vec::new()));
+    }
+
     //Parse opening tag closing bracket
     parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
     //Parse child if it exists
@@ -275,6 +315,10 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     //Parse closing tag closing bracket
     parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
 
+    get_element(tag, Arc::new(child_nodes))
+}
+
+fn get_element(tag: String, child_nodes: Arc<Vec<TemplateNode>>) -> Result<Element, ParseError> {
     //If its an uppercase tag, its a custom element
     if tag.chars().next().unwrap().is_uppercase() {
         Ok(Element::Component {
@@ -283,7 +327,7 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
                 //TODO convert the token stream into the hashmap
                 properties: HashMap::new(),
             },
-            child_nodes: Arc::new(child_nodes),
+            child_nodes,
         })
     } else {
         Ok(Element::Html {
@@ -291,7 +335,7 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
                 tag,
                 attributes: HashMap::new(),
             },
-            child_nodes: Arc::new(child_nodes),
+            child_nodes,
         })
     }
 }
