@@ -2,6 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use proc_macro2::{Ident, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub enum TemplateNode {
@@ -29,6 +31,7 @@ pub struct HtmlElement {
     pub attributes: HashMap<String, String>,
 }
 
+/// Macrotic writing out TemplateNode -> Node
 impl ToTokens for TemplateNode {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         {
@@ -43,7 +46,7 @@ impl ToTokens for TemplateNode {
                                 tag: #tag.to_string(),
                                 attributes: Default::default(),
                             },
-                            child_nodes: Arc::new(vec![#(#child_nodes),*])
+                            child_nodes: std::sync::Arc::new(vec![#(#child_nodes),*])
                         }
                     }
                 }
@@ -68,15 +71,19 @@ impl ToTokens for TemplateNode {
                                     #(#properties),*
                                 }
                             ),
-                            child_nodes: Arc::new(vec![#(#child_nodes),*])
+                            child_nodes: std::sync::Arc::new(vec![#(#child_nodes),*])
                         }
                     }
                     .into()
                 }
-                TemplateNode::Expression(tokens) => 
+                TemplateNode::Expression(tokens) => {
+                    let mut hasher = DefaultHasher::new();
+                tokens.to_string().hash(&mut hasher);
+                //Adding the e to make it a valid identifier
+                let hash = format!("_{}", hasher.finish());
                     quote! {
-                        elementary_rs_lib::node::Node::new_expression(Box::new(move || (#tokens).to_string()))
-                    },
+                        elementary_rs_lib::node::Node::Expression(#hash.to_string(), Box::new(move || (#tokens).to_string())).into()
+                    }},
             })
         }
     }

@@ -1,3 +1,3 @@
 [workspace]
-members = ["demo", "elementary-rs-lib", "elementary-rs-macros"]
+members = ["demo", "demo-index", "elementary-rs-lib", "elementary-rs-macros"]
 resolver = "2"

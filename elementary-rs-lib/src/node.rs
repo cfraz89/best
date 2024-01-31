@@ -4,8 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use nanoid::nanoid;
-use web_sys::wasm_bindgen::JsValue;
+use web_sys::{console, wasm_bindgen::JsValue, window};
 
 pub enum Node {
     Text(String),
@@ -75,54 +74,81 @@ impl Display for Node {
                     element.tag()
                 )
             }
-            Node::Expression(uuid, exp_fn) => {
-                write!(f, "<!--#expr:{}-->{}<!--/expr-->", uuid, exp_fn())
+            Node::Expression(id, exp_fn) => {
+                write!(f, "<slot id=\"{}\">{}</slot>", id, exp_fn())
             }
         }
     }
 }
 
 impl Node {
-    pub fn new_expression(expr: Box<dyn Fn() -> String>) -> Self {
-        Node::Expression(nanoid!(10), expr)
-    }
+    // pub fn web_node(&self) -> Result<web_sys::Node, JsValue> {
+    //     match self {
+    //         Node::Text(string) => Ok(web_sys::Text::new_with_data(string)?.into()),
+    //         Node::HtmlElement {
+    //             element: HtmlElement { tag, attributes },
+    //             child_nodes,
+    //         } => {
+    //             let element = web_sys::window()
+    //                 .expect("No window")
+    //                 .document()
+    //                 .expect("no document")
+    //                 .create_element(tag)?;
+    //             for child in child_nodes.iter() {}
+    //             Ok(element.into())
+    //         }
+    //         Node::Component {
+    //             element,
+    //             child_nodes,
+    //         } => {
+    //             let element = web_sys::window()
+    //                 .expect("No window")
+    //                 .document()
+    //                 .expect("no document")
+    //                 .create_element(element.tag())?;
+    //             Ok(element.into())
+    //         }
+    //         Node::Expression(uuid, exp_fn) => {
+    //             let text = web_sys::Text::new_with_data(&exp_fn())?;
+    //             //Todo implement signal listeners here
+    //             Ok(text.into())
+    //         }
+    //     }
+    // }
 
-    pub fn web_node(&self) -> Result<web_sys::Node, JsValue> {
+    pub fn bind(&self) -> Result<(), JsValue> {
         match self {
-            Node::Text(string) => Ok(web_sys::Text::new_with_data(string)?.into()),
-            Node::HtmlElement {
-                element: HtmlElement { tag, attributes },
-                child_nodes,
-            } => {
-                let element = web_sys::window()
+            // document.evaluate("//h1[contains(., 'Hello')]", document, null, XPathResult.ANY_TYPE, null );
+            Node::Expression(id, expr) => {
+                let document = window()
                     .expect("No window")
                     .document()
-                    .expect("no document")
-                    .create_element(tag)?;
-                for child in child_nodes.iter() {}
-                Ok(element.into())
+                    .expect("no document");
+                let result = document
+                    .query_selector(format!("slot#{id}").as_str())?
+                    .unwrap();
+                result.set_text_content(Some(format!("JS: {}", expr()).as_str()));
+                Ok(())
+            }
+            Node::HtmlElement {
+                element,
+                child_nodes,
+            } => {
+                for child in child_nodes.iter() {
+                    child.bind()?;
+                }
+                Ok(())
             }
             Node::Component {
                 element,
                 child_nodes,
             } => {
-                let element = web_sys::window()
-                    .expect("No window")
-                    .document()
-                    .expect("no document")
-                    .create_element(element.tag())?;
-                Ok(element.into())
+                for child in child_nodes.iter() {
+                    child.bind()?;
+                }
+                Ok(())
             }
-            Node::Expression(uuid, exp_fn) => {
-                let text = web_sys::Text::new_with_data(&exp_fn())?;
-                //Todo implement signal listeners here
-                Ok(text.into())
-            }
+            _ => Ok(()),
         }
     }
-
-    // impl bind_template(&self) -> Result<(), JsValue> {
-    //     match self
-
-    // }
 }

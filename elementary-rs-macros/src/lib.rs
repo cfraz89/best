@@ -1,52 +1,21 @@
 #![feature(proc_macro_span)]
 #![feature(proc_macro_diagnostic)]
-#![feature(lazy_cell)]
 mod node;
 
-use std::{
-    collections::HashMap,
-    iter::Peekable,
-    sync::{Arc, LazyLock, Mutex},
-};
+use std::{collections::HashMap, iter::Peekable, sync::Arc};
 
 use node::TemplateNode;
 use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
-use syn::{self, parse_macro_input, DeriveInput, LitStr};
-
-static REGISTERED_COMPONENTS: LazyLock<Mutex<HashMap<String, String>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+use syn::{self, parse_macro_input, DeriveInput};
 
 /// Parse a #derive(CustomElement) macro
-#[proc_macro_derive(CustomElement, attributes(custom_element))]
+#[proc_macro_derive(CustomElement)]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
-    let mut tag = Option::None;
-    input.attrs.iter().for_each(|attr| {
-        if attr.path().is_ident("custom_element") {
-            attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("tag") {
-                    tag = Some(meta.value()?.parse::<LitStr>()?.value());
-                    return Ok(());
-                }
-                Err(meta.error("expected `tag` or `tag = \"...\"`"))
-            })
-            .unwrap();
-        }
-    });
     let ident = input.ident;
     let ident_string = format!("component-{}", ident.to_string().to_ascii_lowercase());
-    let final_tag = tag.unwrap_or(ident.to_string());
-    REGISTERED_COMPONENTS
-        .lock()
-        .unwrap()
-        .insert(final_tag.clone(), ident.to_string());
-    println!(
-        "Registered component: {:?} -> {:?}",
-        final_tag,
-        ident.clone()
-    );
 
     quote! {
         impl elementary_rs_lib::node::CustomElement for #ident {
