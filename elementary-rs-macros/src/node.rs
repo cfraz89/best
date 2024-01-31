@@ -73,9 +73,10 @@ impl ToTokens for TemplateNode {
                     }
                     .into()
                 }
-                TemplateNode::Expression(tokens) => quote! {
-                    elementary_rs_lib::node::Node::Expression(Box::new(|| (#tokens).to_string()))
-                },
+                TemplateNode::Expression(tokens) => 
+                    quote! {
+                        elementary_rs_lib::node::Node::new_expression(Box::new(move || (#tokens).to_string()))
+                    },
             })
         }
     }

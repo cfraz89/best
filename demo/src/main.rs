@@ -1,6 +1,6 @@
 #![recursion_limit = "512"]
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     body::Body,
@@ -52,9 +52,9 @@ impl IntoResponse for Document {
     }
 }
 
-const x: i32 = 10;
 // basic handler that responds with a static string
 async fn root() -> Document {
+    let x = 10;
     node!(
         <div>
             <MyH1>

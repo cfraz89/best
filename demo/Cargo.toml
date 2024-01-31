@@ -12,6 +12,5 @@ tokio = { version = "1.35.1", features = ["full"] }
 tracing-subscriber = "0.3.18"
 elementary-rs-macros = { path = "../elementary-rs-macros" }
 elementary-rs-lib = { path = "../elementary-rs-lib" }
-web-sys = "0.3.67"
 proc-macro2 = "1.0.78"
 quote = "1.0.35"

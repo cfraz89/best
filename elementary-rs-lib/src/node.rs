@@ -4,6 +4,9 @@ use std::{
     sync::Arc,
 };
 
+use nanoid::nanoid;
+use web_sys::wasm_bindgen::JsValue;
+
 pub enum Node {
     Text(String),
     HtmlElement {
@@ -14,7 +17,7 @@ pub enum Node {
         element: Box<dyn Component>,
         child_nodes: Arc<Vec<Node>>,
     },
-    Expression(Box<dyn Fn() -> String>),
+    Expression(String, Box<dyn Fn() -> String>),
 }
 
 pub struct HtmlElement {
@@ -45,9 +48,9 @@ impl Display for Node {
                     .join(" ");
                 write!(f, "<{}{}", tag, attributes_string)?;
                 if child_nodes.is_empty() {
-                    write!(f, " />");
+                    write!(f, " />")?;
                 } else {
-                    write!(f, ">")?;
+                    write!(f, " >")?;
                     for child in child_nodes.iter() {
                         child.fmt(f)?;
                     }
@@ -72,7 +75,54 @@ impl Display for Node {
                     element.tag()
                 )
             }
-            Node::Expression(exp_fn) => write!(f, "{}", exp_fn()),
+            Node::Expression(uuid, exp_fn) => {
+                write!(f, "<!--#expr:{}-->{}<!--/expr-->", uuid, exp_fn())
+            }
         }
     }
+}
+
+impl Node {
+    pub fn new_expression(expr: Box<dyn Fn() -> String>) -> Self {
+        Node::Expression(nanoid!(10), expr)
+    }
+
+    pub fn web_node(&self) -> Result<web_sys::Node, JsValue> {
+        match self {
+            Node::Text(string) => Ok(web_sys::Text::new_with_data(string)?.into()),
+            Node::HtmlElement {
+                element: HtmlElement { tag, attributes },
+                child_nodes,
+            } => {
+                let element = web_sys::window()
+                    .expect("No window")
+                    .document()
+                    .expect("no document")
+                    .create_element(tag)?;
+                for child in child_nodes.iter() {}
+                Ok(element.into())
+            }
+            Node::Component {
+                element,
+                child_nodes,
+            } => {
+                let element = web_sys::window()
+                    .expect("No window")
+                    .document()
+                    .expect("no document")
+                    .create_element(element.tag())?;
+                Ok(element.into())
+            }
+            Node::Expression(uuid, exp_fn) => {
+                let text = web_sys::Text::new_with_data(&exp_fn())?;
+                //Todo implement signal listeners here
+                Ok(text.into())
+            }
+        }
+    }
+
+    // impl bind_template(&self) -> Result<(), JsValue> {
+    //     match self
+
+    // }
 }

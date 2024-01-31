@@ -197,7 +197,6 @@ dependencies = [
  "serde",
  "tokio",
  "tracing-subscriber",
- "web-sys",
 ]
 
 [[package]]
@@ -236,8 +235,8 @@ checksum = "3a68a4904193147e0a8dec3314640e6db742afd5f6e634f428a6af230d9b3591"
 name = "elementary-rs-lib"
 version = "0.1.0"
 dependencies = [
- "proc-macro2",
- "quote",
+ "nanoid",
+ "web-sys",
 ]
 
 [[package]]
@@ -594,6 +593,15 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys",
+]
+
+[[package]]
+name = "nanoid"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
+dependencies = [
+ "rand",
 ]
 
 [[package]]
