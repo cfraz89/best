@@ -4,13 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use wasm_bindgen::prelude::*;
-use web_sys::{
-    console,
-    js_sys::{wasm_bindgen, Function},
-    wasm_bindgen::{convert::RefFromWasmAbi, JsValue},
-    window,
-};
+use web_sys::{wasm_bindgen::JsValue, window};
 
 pub enum Node {
     Text(String),

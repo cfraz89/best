@@ -222,7 +222,6 @@ dependencies = [
  "elementary-rs-macros",
  "gloo-utils",
  "serde",
- "serde-wasm-bindgen",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -265,10 +264,8 @@ name = "elementary-rs-lib"
 version = "0.1.0"
 dependencies = [
  "getrandom",
- "gloo-utils",
  "nanoid",
  "serde",
- "serde-wasm-bindgen",
  "serde_json",
  "uuid",
  "web-sys",
@@ -993,17 +990,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "870026e60fa08c69f064aa766c10f10b1d62db9ccd4d0abb206472bee0ce3b32"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde-wasm-bindgen"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9b713f70513ae1f8d92665bbbbda5c295c2cf1da5542881ae5eefe20c9af132"
-dependencies = [
- "js-sys",
- "serde",
- "wasm-bindgen",
 ]
 
 [[package]]
