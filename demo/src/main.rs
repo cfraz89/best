@@ -1,21 +1,13 @@
 #![recursion_limit = "512"]
 
 use axum::{
-    body::Body,
-    http::{Response, StatusCode},
     response::{Html, IntoResponse},
-    routing::{get, post},
-    Json, Router,
+    routing::get,
+    Router,
 };
-use demo_index::root_node;
-use elementary_rs_lib::{
-    node::{Component, Node},
-    page::Page,
-};
-use serde::{Deserialize, Serialize};
-use std::fmt::Write;
+use demo_index::IndexPage;
+use elementary_rs_lib::page::render_page;
 use tower_http::services::ServeDir;
-use wasm_bindgen::prelude::*;
 
 #[tokio::main]
 async fn main() {
@@ -34,5 +26,6 @@ async fn main() {
 }
 
 async fn root() -> impl IntoResponse {
-    Html(Page(root_node()).render("./wasm/demo_index.js"))
+    let page = render_page(IndexPage { x: 20 }).await.unwrap();
+    Html(page).into_response()
 }

@@ -4,7 +4,13 @@ use std::{
     sync::Arc,
 };
 
-use web_sys::{console, wasm_bindgen::JsValue, window};
+use wasm_bindgen::prelude::*;
+use web_sys::{
+    console,
+    js_sys::{wasm_bindgen, Function},
+    wasm_bindgen::{convert::RefFromWasmAbi, JsValue},
+    window,
+};
 
 pub enum Node {
     Text(String),
@@ -19,6 +25,83 @@ pub enum Node {
     Expression(String, Box<dyn Fn() -> String>),
 }
 
+// impl From<&'static Node> for ClientNode {
+//     fn from(node: &'static Node) -> Self {
+//         match node {
+//             Node::Text(string) => ClientNode {
+//                 child_nodes: vec![],
+//                 expression: None,
+//             },
+//             Node::HtmlElement {
+//                 element,
+//                 child_nodes,
+//             } => ClientNode {
+//                 child_nodes: child_nodes
+//                     .iter()
+//                     .map(|node| node.into())
+//                     .collect::<Vec<ClientNode>>(),
+//                 expression: None,
+//             },
+//             Node::Component {
+//                 element,
+//                 child_nodes,
+//             } => ClientNode {
+//                 child_nodes: child_nodes.iter().map(|node| node.into()).collect(),
+//                 expression: None,
+//             },
+//             Node::Expression(id, exp_fn) => ClientNode {
+//                 child_nodes: vec![],
+//                 expression: Some(ClientExpression {
+//                     id: id.to_string(),
+//                     expr: Closure::wrap(Box::new(exp_fn.to_owned())),
+//                 }),
+//             },
+//         }
+//     }
+// }
+
+// #[wasm_bindgen]
+// pub struct ClientNode {
+//     child_nodes: Vec<ClientNode>,
+//     expression: Option<ClientExpression>,
+// }
+
+// #[wasm_bindgen]
+// struct ClientExpression {
+//     id: String,
+//     expr: Closure<dyn Fn() -> String>,
+// }
+
+// impl ClientNode {
+//     pub fn bind(&self) -> Result<(), JsValue> {
+//         for child in self.child_nodes.iter() {
+//             child.bind()?;
+//         }
+//         if let Some(ClientExpression { ref id, ref expr }) = self.expression {
+//             let document = window()
+//                 .expect("No window")
+//                 .document()
+//                 .expect("no document");
+//             let result = document
+//                 .query_selector(format!("slot#{id}").as_str())?
+//                 .unwrap();
+//             result.set_text_content(Some(
+//                 format!(
+//                     "JS: {}",
+//                     expr.as_ref()
+//                         .unchecked_ref::<Function>()
+//                         .call0(&JsValue::default())?
+//                         .as_string()
+//                         .unwrap()
+//                 )
+//                 .as_str(),
+//             ));
+//         }
+//         Ok(())
+//     }
+// }
+
+#[derive(Clone)]
 pub struct HtmlElement {
     pub tag: String,
     pub attributes: HashMap<String, String>,
@@ -118,20 +201,9 @@ impl Node {
 
     pub fn bind(&self) -> Result<(), JsValue> {
         match self {
-            // document.evaluate("//h1[contains(., 'Hello')]", document, null, XPathResult.ANY_TYPE, null );
-            Node::Expression(id, expr) => {
-                let document = window()
-                    .expect("No window")
-                    .document()
-                    .expect("no document");
-                let result = document
-                    .query_selector(format!("slot#{id}").as_str())?
-                    .unwrap();
-                result.set_text_content(Some(format!("JS: {}", expr()).as_str()));
-                Ok(())
-            }
+            Node::Text(_) => Ok(()),
             Node::HtmlElement {
-                element,
+                element: HtmlElement { tag, attributes },
                 child_nodes,
             } => {
                 for child in child_nodes.iter() {
@@ -148,7 +220,17 @@ impl Node {
                 }
                 Ok(())
             }
-            _ => Ok(()),
+            Node::Expression(id, expr) => {
+                let document = window()
+                    .expect("No window")
+                    .document()
+                    .expect("no document");
+                let result = document
+                    .query_selector(format!("slot#{id}").as_str())?
+                    .unwrap();
+                result.set_text_content(Some(format!("JS: {}", expr()).as_str()));
+                Ok(())
+            }
         }
     }
 }

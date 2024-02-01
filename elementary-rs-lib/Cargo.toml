@@ -5,13 +5,12 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[profile.release]
-lto = true
-opt-level = 's'
-
 [dependencies]
 getrandom = { version = "0.2.12", features = ["js"] }
 nanoid = "0.4.0"
+serde = "1.0.196"
+serde-wasm-bindgen = "0.6.3"
+serde_json = "1.0.113"
 uuid = { version = "1.7.0", features = ["v4", "fast-rng", "js"] }
 web-sys = { version = "0.3.67", features = [
   "HtmlElement",

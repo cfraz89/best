@@ -17,3 +17,4 @@ quote = "1.0.35"
 wasm-bindgen = "0.2.90"
 wasm-bindgen-futures = "0.4.40"
 tower-http = { version = "0.5.1", features = ["fs"] }
+elementary-rs-macros = { version = "0.1.0", path = "../elementary-rs-macros" }

@@ -1,3 +1,7 @@
 [workspace]
 members = ["demo", "demo-index", "elementary-rs-lib", "elementary-rs-macros"]
 resolver = "2"
+
+[profile.release]
+lto = true
+opt-level = 's'
