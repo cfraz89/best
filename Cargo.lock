@@ -265,6 +265,7 @@ name = "elementary-rs-lib"
 version = "0.1.0"
 dependencies = [
  "getrandom",
+ "gloo-utils",
  "nanoid",
  "serde",
  "serde-wasm-bindgen",

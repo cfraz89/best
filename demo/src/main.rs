@@ -27,5 +27,5 @@ async fn main() {
 
 async fn root() -> impl IntoResponse {
     let page = render_page(IndexPage { x: 20 }).await.unwrap();
-    Html(page).into_response()
+    Html(page)
 }
