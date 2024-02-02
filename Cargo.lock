@@ -31,6 +31,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-recursion"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fd55a5ba1179988837d24ab4c7cc8ed6efdeff578ede0416b4225a5fca35bd0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -217,6 +228,8 @@ dependencies = [
 name = "demo-index"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "cfg-if",
  "console_error_panic_hook",
  "elementary-rs-lib",
  "elementary-rs-macros",
@@ -263,6 +276,9 @@ checksum = "3a68a4904193147e0a8dec3314640e6db742afd5f6e634f428a6af230d9b3591"
 name = "elementary-rs-lib"
 version = "0.1.0"
 dependencies = [
+ "async-recursion",
+ "async-trait",
+ "cfg-if",
  "getrandom",
  "nanoid",
  "serde",

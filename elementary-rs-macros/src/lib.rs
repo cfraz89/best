@@ -9,8 +9,8 @@ use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
 use syn::{self, parse_macro_input, DeriveInput};
 
-/// Parse a #derive(CustomElement) macro
-#[proc_macro_derive(CustomElement)]
+/// Parse a #derive(ComponentData) macro
+#[proc_macro_derive(ComponentData)]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
@@ -18,9 +18,19 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     let ident_string = format!("component-{}", ident.to_string().to_ascii_lowercase());
 
     quote! {
-        impl elementary_rs_lib::node::CustomElement for #ident {
+        impl elementary_rs_lib::node::ComponentData for #ident {
             fn tag(&self) -> &'static str {
                 #ident_string
+            }
+
+    #[cfg(not(any(target_arch = "wasm32", feature = "web")))]
+            fn set_server_data(&mut self, data: serde_json::Value) {
+                self.server_data = data;
+            }
+
+    #[cfg(any(target_arch = "wasm32", feature = "web"))]
+            fn get_server_data(&self) -> serde_json::Value {
+                self.server_data
             }
         }
     }

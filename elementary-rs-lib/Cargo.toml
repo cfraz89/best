@@ -6,6 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-recursion = "1.0.5"
+async-trait = "0.1.77"
+cfg-if = "1.0.0"
 getrandom = { version = "0.2.12", features = ["js"] }
 nanoid = "0.4.0"
 serde = "1.0.196"
