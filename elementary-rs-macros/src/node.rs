@@ -68,6 +68,7 @@ impl ToTokens for TemplateNode {
                         elementary_rs_lib::node::Node::Component {
                             element: Box::new(
                                 #name_ident {
+                                    _server_data: None,
                                     #(#properties),*
                                 }
                             ),

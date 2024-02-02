@@ -25,7 +25,10 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn root() -> impl IntoResponse {
-    let page = render_page(IndexPage { x: 20 }).await.unwrap();
+#[axum::debug_handler]
+async fn root() -> Html<String> {
+    let page = render_page(IndexPage { x: 20 })
+        .await
+        .expect("Render page didnt return!");
     Html(page)
 }

@@ -11,7 +11,6 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0.76"
 quote = "1.0.35"
-scraper = "0.18.1"
 syn = "2.0.48"
 thiserror = "1.0.56"
 elementary-rs-lib = { path = "../elementary-rs-lib" }

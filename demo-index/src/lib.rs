@@ -1,11 +1,9 @@
-use std::future::Future;
-
 use async_trait::async_trait;
 use elementary_rs_lib::{
     node::{Component, Node},
     page::Page,
 };
-use elementary_rs_macros::{node, ComponentData};
+use elementary_rs_macros::{component, node, ComponentSupport};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -14,22 +12,21 @@ pub async fn init_document() -> Result<(), JsValue> {
     Ok(())
 }
 
-#[cfg_attr(any(target = "wasm32", feature = "web"), derive(serde::Deserialize))]
-#[cfg_attr(not(any(target = "wasm32", feature = "web")), derive(serde::Serialize))]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]
+#[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize))]
 pub struct IndexPage {
     pub x: i32,
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(any(target = "wasm32", feature = "web"))] {
-
-use gloo_utils::format::JsValueSerdeExt;
-#[wasm_bindgen]
-pub async fn render(value: JsValue) -> Result<(), JsValue> {
-    let page: IndexPage = value.into_serde().unwrap();
-    let node = page.node().await;
-    node.bind()
-}
+    if #[cfg(target_arch = "wasm32")] {
+        use gloo_utils::format::JsValueSerdeExt;
+        #[wasm_bindgen]
+        pub async fn render(value: JsValue) -> Result<(), JsValue> {
+            let page: IndexPage = value.into_serde().expect("Could not deserialize initial value!");
+            let node = page.node().await;
+            node.bind()
+        }
     }
 }
 
@@ -44,12 +41,13 @@ impl Page for IndexPage {
         )
     }
 
-    #[cfg(not(any(target = "wasm32", feature = "web")))]
+    #[cfg(not(target_arch = "wasm32"))]
     fn wasm_path(&self) -> &'static str {
         "./wasm/demo_index.js"
     }
 }
-#[derive(ComponentData)]
+#[derive(ComponentSupport)]
+#[component]
 pub struct MyH1 {}
 
 #[async_trait]

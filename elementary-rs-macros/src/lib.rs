@@ -7,10 +7,10 @@ use std::{collections::HashMap, iter::Peekable, sync::Arc};
 use node::TemplateNode;
 use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
-use syn::{self, parse_macro_input, DeriveInput};
+use syn::{self, parse_macro_input, DeriveInput, ItemStruct};
 
 /// Parse a #derive(ComponentData) macro
-#[proc_macro_derive(ComponentData)]
+#[proc_macro_derive(ComponentSupport)]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
@@ -19,22 +19,37 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
 
     quote! {
         impl elementary_rs_lib::node::ComponentData for #ident {
-            fn tag(&self) -> &'static str {
-                #ident_string
-            }
 
     #[cfg(not(any(target_arch = "wasm32", feature = "web")))]
-            fn set_server_data(&mut self, data: serde_json::Value) {
-                self.server_data = data;
+            fn set_server_data(&mut self, data: Option<serde_json::Value>) {
+                self._server_data = data;
             }
 
     #[cfg(any(target_arch = "wasm32", feature = "web"))]
-            fn get_server_data(&self) -> serde_json::Value {
-                self.server_data
+            fn get_server_data(&self) -> Option<&serde_json::Value> {
+                self._server_data.as_ref()
+            }
+        }
+
+        impl elementary_rs_lib::node::ComponentTag for #ident {
+            fn tag(&self) -> &'static str {
+                #ident_string
             }
         }
     }
     .into()
+}
+
+#[proc_macro_attribute]
+pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut item_struct = parse_macro_input!(item as ItemStruct);
+
+    if let syn::Fields::Named(ref mut fields) = item_struct.fields {
+        let field: syn::Field = syn::parse_quote! { _server_data: Option<serde_json::Value> };
+        fields.named.push(field);
+    }
+
+    item_struct.to_token_stream().into()
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -171,10 +186,7 @@ fn parse_tag_name(iter: &mut Peekable<IntoIter>) -> Result<String, ParseError> {
 pub fn node(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
     match parse_node(iter) {
-        Ok(node) => {
-            println!("{:?}", node);
-            node.to_token_stream().into()
-        }
+        Ok(node) => node.to_token_stream().into(),
         Err(ParseError::EndOfInput { expected }) => {
             panic!("Unexpected end of input, expected {}", expected)
         }
