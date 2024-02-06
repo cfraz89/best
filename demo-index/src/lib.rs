@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use elementary_rs_lib::node::ComponentLoad;
 use elementary_rs_lib::{
     node::{Component, Node},
     page::Page,
@@ -53,9 +54,13 @@ pub struct MyH1 {}
 #[async_trait]
 impl Component for MyH1 {
     async fn view(&self) -> Node {
+        let db_data = self
+            .server_load(|| async { "hello from server!".to_owned() })
+            .await;
         node! {
             <h1>
-            <slot />
+            <slot></slot>
+            {db_data}
             </h1>
         }
     }

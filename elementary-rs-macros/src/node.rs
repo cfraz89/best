@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use proc_macro2::{Ident, TokenStream, TokenTree};
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -68,7 +68,7 @@ impl ToTokens for TemplateNode {
                         elementary_rs_lib::node::Node::Component {
                             element: Box::new(
                                 #name_ident {
-                                    _server_data: None,
+                                    _server_data: std::sync::Mutex::new(Default::default()),
                                     #(#properties),*
                                 }
                             ),
@@ -81,10 +81,10 @@ impl ToTokens for TemplateNode {
                     let mut hasher = DefaultHasher::new();
                 tokens.to_string().hash(&mut hasher);
                 //Adding the e to make it a valid identifier
-                let hash = format!("_{}", hasher.finish());
-                    quote! {
-                        elementary_rs_lib::node::Node::Expression(#hash.to_string(), Box::new(move || (#tokens).to_string())).into()
-                    }},
+                let hash = hasher.finish();
+                quote! {
+                    elementary_rs_lib::node::Node::Expression(#hash.to_string(), Box::new(move || (#tokens).to_string())).into()
+                }},
             })
         }
     }

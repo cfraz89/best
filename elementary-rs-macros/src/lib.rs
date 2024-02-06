@@ -18,16 +18,30 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     let ident_string = format!("component-{}", ident.to_string().to_ascii_lowercase());
 
     quote! {
-        impl elementary_rs_lib::node::ComponentData for #ident {
-
-    #[cfg(not(any(target_arch = "wasm32", feature = "web")))]
-            fn set_server_data(&mut self, data: Option<serde_json::Value>) {
-                self._server_data = data;
+        impl elementary_rs_lib::node::ComponentLoad for #ident {
+            //On the server, we actually load the data and store it for serialization
+            #[cfg(not(target_arch = "wasm32"))]
+            async fn server_load<D: serde::Serialize, F: std::future::Future<Output = D>>(
+                &self,
+                load: impl Fn() -> F,
+            ) -> D {
+                let data = load().await;
+                let mut server_data = self._server_data.lock().unwrap();
+                *server_data = Some(serde_json::to_value(&data).unwrap());
+                data
             }
 
-    #[cfg(any(target_arch = "wasm32", feature = "web"))]
-            fn get_server_data(&self) -> Option<&serde_json::Value> {
-                self._server_data.as_ref()
+            //On the client, load the serialized data
+            #[cfg(target_arch = "wasm32")]
+            async fn server_load<D: serde::de::DeserializeOwned, F: std::future::Future<Output = D>>(
+                &self,
+                load: impl Fn() -> F,
+            ) -> D {
+                if let Some(data) = self._server_data.lock().unwrap().as_ref() {
+                    serde_json::from_value(data.clone()).expect("No server data to load!")
+                } else {
+                    panic!("No server data")
+                }
             }
         }
 
@@ -41,11 +55,12 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn component(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut item_struct = parse_macro_input!(item as ItemStruct);
 
     if let syn::Fields::Named(ref mut fields) = item_struct.fields {
-        let field: syn::Field = syn::parse_quote! { _server_data: Option<serde_json::Value> };
+        let field: syn::Field =
+            syn::parse_quote! { _server_data: std::sync::Mutex<Option<serde_json::Value>> };
         fields.named.push(field);
     }
 
@@ -158,7 +173,7 @@ fn parse_tag_name(iter: &mut Peekable<IntoIter>) -> Result<String, ParseError> {
                 joint_to_continue_name = false;
                 Ok(())
             }
-            (TokenTree::Punct(p), Some(t)) if p.as_char() == '/' || p.as_char() == '>' => {
+            (TokenTree::Punct(p), Some(_t)) if p.as_char() == '/' || p.as_char() == '>' => {
                 break;
             }
             (TokenTree::Punct(p), None) => Err(ParseError::UnexpectedToken {

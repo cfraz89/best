@@ -1,10 +1,11 @@
+#![feature(exit_status_error)]
 use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=../demo-index");
     println!("cargo:rerun-if-changed=../elementary-rs-lib");
     println!("cargo:rerun-if-changed=../elementary-rs-macros");
-    Command::new("cargo")
+    let build_status = Command::new("cargo")
         .args([
             "build",
             "-p",
@@ -15,11 +16,11 @@ fn main() {
             "wasm32-unknown-unknown",
             "--release",
         ])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
-    Command::new("wasm-bindgen")
+        .status()
+        .expect("Build demo-index failed");
+    build_status.exit_ok().unwrap();
+
+    let wasm_bindgen_status = Command::new("wasm-bindgen")
         .args([
             "--target",
             "web",
@@ -27,19 +28,18 @@ fn main() {
             "--out-dir",
             "../target-wasm/pkg",
         ])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
-    Command::new("wasm-opt")
+        .status()
+        .expect("wasm-bindgen failed");
+    wasm_bindgen_status.exit_ok().unwrap();
+
+    let wasm_opt_status = Command::new("wasm-opt")
         .args([
             "-Os",
             "-o",
             "../target-wasm/pkg/demo_index.wasm",
             "../target-wasm/pkg/demo_index_bg.wasm",
         ])
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap();
+        .status()
+        .expect("wasm-opt failed");
+    wasm_opt_status.exit_ok().unwrap();
 }

@@ -1,6 +1,11 @@
 use std::{collections::HashMap, future::Future, sync::Arc};
 
 use async_trait::async_trait;
+use web_sys::{console, wasm_bindgen::JsCast};
+
+/// https://developer.mozilla.org/en-US/docs/Web/API/Document/createTreeWalker
+/// Ashamedly had to reference leptos here
+const SHOW_COMMENT: u32 = 0x80;
 
 pub enum Node {
     Text(String),
@@ -20,12 +25,19 @@ pub struct HtmlElement {
     pub attributes: HashMap<String, String>,
 }
 
-pub trait ComponentData {
-    #[cfg(not(any(target_arch = "wasm32", feature = "web")))]
-    fn set_server_data(&mut self, data: Option<serde_json::Value>);
-    #[cfg(any(target_arch = "wasm32", feature = "web"))]
-    fn get_server_data(&self) -> Option<&serde_json::Value>;
+pub trait ComponentLoad {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn server_load<D: serde::Serialize, F: Future<Output = D>>(
+        &self,
+        load: impl Fn() -> F,
+    ) -> impl Future<Output = D>;
+    #[cfg(target_arch = "wasm32")]
+    fn server_load<D: serde::de::DeserializeOwned, F: Future<Output = D>>(
+        &self,
+        load: impl Fn() -> F,
+    ) -> impl Future<Output = D>;
 }
+
 pub trait ComponentTag {
     fn tag(&self) -> &'static str;
 }
@@ -34,7 +46,6 @@ pub trait ComponentTag {
 pub trait Component: ComponentTag {
     async fn view(&self) -> Node;
 }
-
 //Object-safe component
 // https://rust-lang.github.io/async-fundamentals-initiative/evaluation/case-studies/builder-provider-api.html#dynamic-dispatch-behind-the-api
 // pub trait ComponentDyn {
@@ -53,32 +64,10 @@ pub trait Component: ComponentTag {
 //     }
 // }
 
-//On the server, we actually load the data and store it for serialization
-#[cfg(not(target_arch = "wasm32"))]
-pub async fn load_server_data<D: serde::Serialize, F: Future<Output = D>>(
-    component: &mut impl ComponentData,
-    load: impl Fn() -> F,
-) -> D {
-    let data = load().await;
-    component.set_server_data(Some(serde_json::to_value(&data).unwrap()));
-    data
-}
-
-//On the client, load the serialized data
-#[cfg(target_arch = "wasm32")]
-pub async fn load_server_data<D: serde::de::DeserializeOwned, F: Future<Output = D>>(
-    component: &mut impl ComponentData,
-    load: impl Fn() -> F,
-) -> D {
-    if let Some(data) = component.get_server_data() {
-        serde_json::from_value(data.clone()).expect("No server data to load!")
-    } else {
-        panic!("No server data")
-    }
-}
+const NO_SELF_CLOSE_TAGS: &[&str] = &["slot"];
 
 cfg_if::cfg_if! {
-    if #[cfg(not(any(target_arch = "wasm32", feature = "web")))] {
+    if #[cfg(not(target_arch = "wasm32"))] {
         use std::fmt::{Write};
         use async_recursion::async_recursion;
         impl Node {
@@ -97,7 +86,8 @@ cfg_if::cfg_if! {
                             .collect::<Vec<String>>()
                             .join(" ");
                         write!(output, "<{}{}", tag, attributes_string)?;
-                        if child_nodes.is_empty() {
+                        // Some tags don't like self_closing
+                        if child_nodes.is_empty() && !NO_SELF_CLOSE_TAGS.contains(&tag.as_str()) {
                             write!(output, " />")?;
                         } else {
                             write!(output, " >")?;
@@ -125,8 +115,9 @@ cfg_if::cfg_if! {
                         write!(output, "</{}>", element.tag())?;
                         Ok(output)
                     }
+                    //We place comments around our templated expression so that we can locate it for hydration
                     Node::Expression(id, exp_fn) => {
-                        Ok(format!("<slot id=\"{}\">{}</slot>", id, exp_fn()))
+                        Ok(format!("<!--#exp:{id}-->{}<!--/exp:{id}-->", exp_fn()))
 
                     }
                 }
@@ -195,10 +186,40 @@ cfg_if::cfg_if! {
                             .expect("No window")
                             .document()
                             .expect("no document");
-                        let result = document
-                            .query_selector(format!("slot#{id}").as_str())?
-                            .expect(format!("No slot id {id}").as_str());
-                        result.set_text_content(Some(format!("JS: {}", expr()).as_str()));
+                        let comments = document
+                          .create_tree_walker_with_what_to_show(&document.body().expect("no body"), SHOW_COMMENT)?;
+                        'start: loop {
+                            let start_comment = comments.next_node()?;
+                            match start_comment {
+                                Some(start_comment) => {
+                                    let start_comment = start_comment.dyn_into::<web_sys::Comment>()?;
+                                    if start_comment.data().starts_with(format!("#exp:{id}").as_str()) {
+                                        let comment_parent = start_comment.parent_node().expect("No parent node on comment");
+                                        'end: loop {
+                                            let end_comment = comments.next_sibling()?;
+                                            match end_comment {
+                                                Some(end_comment) => {
+                                                    let end_comment = end_comment.dyn_into::<web_sys::Comment>()?;
+                                                    if end_comment.data().starts_with(format!("/exp:{id}").as_str()) {
+
+                                                        let mut n = start_comment.next_sibling().expect("Nodes after start comment should have more sibilings");
+                                                        while n != **end_comment {
+                                                            let to_remove = n.to_owned();
+                                                            n = n.next_sibling().expect("Nodes after start comment should have more sibilings");
+                                                            comment_parent.remove_child(&to_remove);
+                                                        }
+                                                        start_comment.after_with_str_1(format!("JS: {}", expr().as_str()).as_str())?;
+                                                        break 'start;
+                                                    }
+                                                }
+                                                None => break 'end
+                                            }
+                                        }
+                                    }
+                                }
+                                None => break
+                            }
+                        }
                         Ok(())
                     }
                 }

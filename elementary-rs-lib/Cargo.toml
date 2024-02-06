@@ -21,6 +21,8 @@ web-sys = { version = "0.3.67", features = [
   "Document",
   "Element",
   "Node",
-  "XPathResult",
   "console",
+  "TreeWalker",
+  "Comment",
+  "CharacterData",
 ] }
