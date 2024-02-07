@@ -1,10 +1,9 @@
 use async_trait::async_trait;
-use elementary_rs_lib::node::ComponentLoad;
 use elementary_rs_lib::{
     node::{Component, Node},
     page::Page,
 };
-use elementary_rs_macros::{component, node, ComponentSupport};
+use elementary_rs_macros::{component, node, server, ComponentSupport};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -25,14 +24,14 @@ cfg_if::cfg_if! {
         #[wasm_bindgen]
         pub async fn render(value: JsValue) -> Result<(), JsValue> {
             let page: IndexPage = value.into_serde().expect("Could not deserialize initial value!");
-            let node = page.node().await;
+            let node = page.build().await;
             node.bind()
         }
     }
 }
 
 impl Page for IndexPage {
-    async fn node(self) -> Node {
+    async fn build(self) -> Node {
         node!(
             <div>
                 <MyH1>
@@ -51,17 +50,23 @@ impl Page for IndexPage {
 #[component]
 pub struct MyH1 {}
 
-#[async_trait]
+// #[async_trait]
 impl Component for MyH1 {
-    async fn view(&self) -> Node {
-        let db_data = self
-            .server_load(|| async { "hello from server!".to_owned() })
-            .await;
+    async fn build(&self) -> Node {
+        let title = self.my_title().await;
         node! {
-            <h1>
-            <slot></slot>
-            {db_data}
-            </h1>
+            <div>
+                <h1>{title}</h1>
+                <div>Hi</div>
+                <slot />
+            </div>
         }
+    }
+}
+
+impl MyH1 {
+    #[server]
+    async fn my_title(&self) -> String {
+        "Server title".to_string()
     }
 }

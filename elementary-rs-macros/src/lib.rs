@@ -6,8 +6,11 @@ use std::{collections::HashMap, iter::Peekable, sync::Arc};
 
 use node::TemplateNode;
 use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
+use proc_macro2::Ident;
 use quote::{quote, ToTokens};
-use syn::{self, parse_macro_input, DeriveInput, ItemStruct};
+use syn::{
+    self, parse_macro_input, punctuated::Punctuated, DeriveInput, ImplItemFn, ItemFn, ItemStruct,
+};
 
 /// Parse a #derive(ComponentData) macro
 #[proc_macro_derive(ComponentSupport)]
@@ -18,32 +21,32 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     let ident_string = format!("component-{}", ident.to_string().to_ascii_lowercase());
 
     quote! {
-        impl elementary_rs_lib::node::ComponentLoad for #ident {
-            //On the server, we actually load the data and store it for serialization
-            #[cfg(not(target_arch = "wasm32"))]
-            async fn server_load<D: serde::Serialize, F: std::future::Future<Output = D>>(
-                &self,
-                load: impl Fn() -> F,
-            ) -> D {
-                let data = load().await;
-                let mut server_data = self._server_data.lock().unwrap();
-                *server_data = Some(serde_json::to_value(&data).unwrap());
-                data
-            }
+        // impl elementary_rs_lib::node::ComponentLoad for #ident {
+        //     //On the server, we actually load the data and store it for serialization
+        //     #[cfg(not(target_arch = "wasm32"))]
+        //     async fn server_load<D: serde::Serialize, F: std::future::Future<Output = D>>(
+        //         &self,
+        //         load: impl Fn() -> F,
+        //     ) -> D {
+        //         let data = load().await;
+        //         let mut server_data = self._server_data.lock().unwrap();
+        //         *server_data = Some(serde_json::to_value(&data).unwrap());
+        //         data
+        //     }
 
-            //On the client, load the serialized data
-            #[cfg(target_arch = "wasm32")]
-            async fn server_load<D: serde::de::DeserializeOwned, F: std::future::Future<Output = D>>(
-                &self,
-                load: impl Fn() -> F,
-            ) -> D {
-                if let Some(data) = self._server_data.lock().unwrap().as_ref() {
-                    serde_json::from_value(data.clone()).expect("No server data to load!")
-                } else {
-                    panic!("No server data")
-                }
-            }
-        }
+        //     //On the client, load the serialized data
+        //     #[cfg(target_arch = "wasm32")]
+        //     async fn server_load<D: serde::de::DeserializeOwned, F: std::future::Future<Output = D>>(
+        //         &self,
+        //         load: impl Fn() -> F,
+        //     ) -> D {
+        //         if let Some(data) = self._server_data.lock().unwrap().as_ref() {
+        //             serde_json::from_value(data.clone()).expect("No server data to load!")
+        //         } else {
+        //             panic!("No server data")
+        //         }
+        //     }
+        // }
 
         impl elementary_rs_lib::node::ComponentTag for #ident {
             fn tag(&self) -> &'static str {
@@ -55,12 +58,54 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
+pub fn server(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut item_fn = parse_macro_input!(item as ImplItemFn);
+    let ident = item_fn.clone().sig.ident;
+    let hidden_name = format!("_{}", ident);
+    let hidden_ident = Ident::new(hidden_name.as_str(), ident.span());
+    let sig = item_fn.sig.clone();
+    item_fn.sig.ident = hidden_ident.clone();
+    let hidden_args = item_fn
+        .sig
+        .inputs
+        .clone()
+        .into_iter()
+        .skip(1)
+        .collect::<Punctuated<syn::FnArg, syn::token::Comma>>();
+    let await_tokens = match item_fn.sig.asyncness {
+        Some(_) => quote! { .await },
+        None => proc_macro2::TokenStream::new(),
+    };
+    quote! {
+        #item_fn
+
+        #[cfg(not(target_arch = "wasm32"))]
+        #sig {
+            let data = self.#hidden_ident(#hidden_args)#await_tokens;
+            let mut server_data = self._server_data.lock().unwrap();
+            server_data.insert(#hidden_name.to_string(), serde_json::to_value(&data).unwrap());
+            data
+        }
+
+        //On the client, load the serialized data
+        #[cfg(target_arch = "wasm32")]
+        #sig {
+            if let Some(data) = self._server_data.lock().unwrap().get(#hidden_name) {
+                serde_json::from_value(data.clone()).expect("No server data to load!")
+            } else {
+                panic!("No server data")
+            }
+        }
+    }
+    .into()
+}
+
+#[proc_macro_attribute]
 pub fn component(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut item_struct = parse_macro_input!(item as ItemStruct);
 
     if let syn::Fields::Named(ref mut fields) = item_struct.fields {
-        let field: syn::Field =
-            syn::parse_quote! { _server_data: std::sync::Mutex<Option<serde_json::Value>> };
+        let field: syn::Field = syn::parse_quote! { _server_data: std::sync::Mutex<std::collections::HashMap<String, serde_json::Value>> };
         fields.named.push(field);
     }
 
