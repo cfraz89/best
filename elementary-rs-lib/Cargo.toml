@@ -11,7 +11,7 @@ async-trait = "0.1.77"
 cfg-if = "1.0.0"
 getrandom = { version = "0.2.12", features = ["js"] }
 nanoid = "0.4.0"
-serde = "1.0.196"
+serde = { version = "1.0.196", features = ["derive"] }
 serde_json = "1.0.113"
 uuid = { version = "1.7.0", features = ["v4", "fast-rng", "js"] }
 web-sys = { version = "0.3.67", features = [
@@ -25,4 +25,5 @@ web-sys = { version = "0.3.67", features = [
   "TreeWalker",
   "Comment",
   "CharacterData",
+  "ShadowRoot",
 ] }

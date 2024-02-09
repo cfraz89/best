@@ -1,9 +1,9 @@
-use async_trait::async_trait;
+use elementary_rs_lib::node::Component;
 use elementary_rs_lib::{
-    node::{Component, Node},
+    node::{Node, ServerDataMap, View},
     page::Page,
 };
-use elementary_rs_macros::{component, node, server, ComponentSupport};
+use elementary_rs_macros::{component, node, server};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -12,8 +12,7 @@ pub async fn init_document() -> Result<(), JsValue> {
     Ok(())
 }
 
-#[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]
-#[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize))]
+#[component]
 pub struct IndexPage {
     pub x: i32,
 }
@@ -22,36 +21,42 @@ cfg_if::cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
         use gloo_utils::format::JsValueSerdeExt;
         #[wasm_bindgen]
-        pub async fn render(value: JsValue) -> Result<(), JsValue> {
-            let page: IndexPage = value.into_serde().expect("Could not deserialize initial value!");
-            let node = page.build().await;
-            node.bind()
+        pub async fn render(serial_page: JsValue, serial_server_data_map: JsValue) -> Result<(), JsValue> {
+            let page: IndexPage = serial_page.into_serde().expect("Could not deserialize initial value!");
+            let server_data_map: ServerDataMap = serial_server_data_map.into_serde().expect("Could not deserialize initial value!");
+            web_sys::console::log_1(&"Got here".into());
+            page.reified_view(Some(&server_data_map)).await;
+            page.bind();
+            Ok(())
         }
     }
 }
 
-impl Page for IndexPage {
-    async fn build(self) -> Node {
+impl View for IndexPage {
+    async fn build(&self) -> Node {
+        let x = self.x;
         node!(
             <div>
                 <MyH1>
-                    {self.x * 10}
+                    {x * 10}
                 </MyH1>
             </div>
         )
     }
+}
 
+impl Page for IndexPage {
     #[cfg(not(target_arch = "wasm32"))]
     fn wasm_path(&self) -> &'static str {
         "./wasm/demo_index.js"
     }
 }
-#[derive(ComponentSupport)]
+// #[derive(ComponentSupport)]
 #[component]
 pub struct MyH1 {}
 
 // #[async_trait]
-impl Component for MyH1 {
+impl View for MyH1 {
     async fn build(&self) -> Node {
         let title = self.my_title().await;
         node! {

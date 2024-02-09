@@ -37,7 +37,7 @@ impl ToTokens for TemplateNode {
         {
             tokens.extend(match self {
                 TemplateNode::HtmlElement {
-                    element: HtmlElement { tag, attributes },
+                    element: HtmlElement { tag, attributes: _},
                     child_nodes,
                 } => {
                     quote! {
@@ -58,6 +58,9 @@ impl ToTokens for TemplateNode {
                     element: ComponentElement { name, properties },
                     child_nodes,
                 } => {
+                    let mut hasher = DefaultHasher::new();
+                    tokens.to_string().hash(&mut hasher);
+                    let hash = hasher.finish();
                     let name_ident = format_ident!("{}", name);
                     let properties = properties.iter().map(|(k, v)| {
                         quote! {
@@ -68,7 +71,8 @@ impl ToTokens for TemplateNode {
                         elementary_rs_lib::node::Node::Component {
                             element: Box::new(
                                 #name_ident {
-                                    _server_data: std::sync::Mutex::new(Default::default()),
+                                    _context: std::default::Default::default(),
+                                    _selector: elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
                                     #(#properties),*
                                 }
                             ),

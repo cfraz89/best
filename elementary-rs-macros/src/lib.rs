@@ -8,54 +8,7 @@ use node::TemplateNode;
 use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
 use proc_macro2::Ident;
 use quote::{quote, ToTokens};
-use syn::{
-    self, parse_macro_input, punctuated::Punctuated, DeriveInput, ImplItemFn, ItemFn, ItemStruct,
-};
-
-/// Parse a #derive(ComponentData) macro
-#[proc_macro_derive(ComponentSupport)]
-pub fn derive_component(input: TokenStream) -> TokenStream {
-    // Parse the input tokens into a syntax tree
-    let input = parse_macro_input!(input as DeriveInput);
-    let ident = input.ident;
-    let ident_string = format!("component-{}", ident.to_string().to_ascii_lowercase());
-
-    quote! {
-        // impl elementary_rs_lib::node::ComponentLoad for #ident {
-        //     //On the server, we actually load the data and store it for serialization
-        //     #[cfg(not(target_arch = "wasm32"))]
-        //     async fn server_load<D: serde::Serialize, F: std::future::Future<Output = D>>(
-        //         &self,
-        //         load: impl Fn() -> F,
-        //     ) -> D {
-        //         let data = load().await;
-        //         let mut server_data = self._server_data.lock().unwrap();
-        //         *server_data = Some(serde_json::to_value(&data).unwrap());
-        //         data
-        //     }
-
-        //     //On the client, load the serialized data
-        //     #[cfg(target_arch = "wasm32")]
-        //     async fn server_load<D: serde::de::DeserializeOwned, F: std::future::Future<Output = D>>(
-        //         &self,
-        //         load: impl Fn() -> F,
-        //     ) -> D {
-        //         if let Some(data) = self._server_data.lock().unwrap().as_ref() {
-        //             serde_json::from_value(data.clone()).expect("No server data to load!")
-        //         } else {
-        //             panic!("No server data")
-        //         }
-        //     }
-        // }
-
-        impl elementary_rs_lib::node::ComponentTag for #ident {
-            fn tag(&self) -> &'static str {
-                #ident_string
-            }
-        }
-    }
-    .into()
-}
+use syn::{self, parse_macro_input, punctuated::Punctuated, ImplItemFn, ItemStruct};
 
 #[proc_macro_attribute]
 pub fn server(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -82,7 +35,7 @@ pub fn server(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(not(target_arch = "wasm32"))]
         #sig {
             let data = self.#hidden_ident(#hidden_args)#await_tokens;
-            let mut server_data = self._server_data.lock().unwrap();
+            let mut server_data = self._context.server_data.lock().unwrap();
             server_data.insert(#hidden_name.to_string(), serde_json::to_value(&data).unwrap());
             data
         }
@@ -90,7 +43,8 @@ pub fn server(_attr: TokenStream, item: TokenStream) -> TokenStream {
         //On the client, load the serialized data
         #[cfg(target_arch = "wasm32")]
         #sig {
-            if let Some(data) = self._server_data.lock().unwrap().get(#hidden_name) {
+            web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!("{:?}", self._context)));
+            if let Some(data) = self._context.server_data.lock().unwrap().get(#hidden_name) {
                 serde_json::from_value(data.clone()).expect("No server data to load!")
             } else {
                 panic!("No server data")
@@ -105,11 +59,44 @@ pub fn component(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut item_struct = parse_macro_input!(item as ItemStruct);
 
     if let syn::Fields::Named(ref mut fields) = item_struct.fields {
-        let field: syn::Field = syn::parse_quote! { _server_data: std::sync::Mutex<std::collections::HashMap<String, serde_json::Value>> };
-        fields.named.push(field);
+        let context_field: syn::Field = syn::parse_quote! {
+            #[serde(skip)]
+            pub _context: elementary_rs_lib::context::Context
+        };
+        let selector_field: syn::Field = syn::parse_quote! {
+            pub _selector: elementary_rs_lib::selector::Selector
+        };
+        fields.named.push(context_field);
+        fields.named.push(selector_field);
     }
 
-    item_struct.to_token_stream().into()
+    let ident = item_struct.ident.clone();
+    let ident_string = format!("component-{}", ident.to_string().to_ascii_lowercase());
+
+    quote! {
+        #[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]
+        #[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize))]
+        #item_struct
+
+        impl elementary_rs_lib::context::ComponentContext for #ident {
+            fn context(&self) -> &elementary_rs_lib::context::Context {
+                &self._context
+            }
+        }
+
+        impl elementary_rs_lib::node::ComponentTag for #ident {
+            fn selector(&self) -> &elementary_rs_lib::selector::Selector {
+                &self._selector
+            }
+
+            fn tag(&self) -> &'static str {
+                #ident_string
+            }
+        }
+
+        impl elementary_rs_lib::node::Component for #ident {}
+    }
+    .into()
 }
 
 #[derive(thiserror::Error, Debug)]

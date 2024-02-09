@@ -1,0 +1,6 @@
+{
+  "rust-analyzer.linkedProjects": [
+    "./elementary-rs-lib/Cargo.toml",
+    "./elementary-rs-lib/Cargo.toml"
+  ]
+}

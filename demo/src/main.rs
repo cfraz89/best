@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use demo_index::IndexPage;
-use elementary_rs_lib::page::render_page;
+use elementary_rs_lib::page::Page;
 use tower_http::services::ServeDir;
 
 #[tokio::main]
@@ -27,8 +27,13 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> Html<String> {
-    let page = render_page(IndexPage { x: 20 })
-        .await
-        .expect("Render page didnt return!");
+    let page = IndexPage {
+        x: 20,
+        _selector: Default::default(),
+        _context: Default::default(),
+    }
+    .render()
+    .await
+    .expect("Render page didnt return!");
     Html(page)
 }

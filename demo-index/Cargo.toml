@@ -19,3 +19,15 @@ cfg-if = "1.0.0"
 serde = { version = "1.0.196", features = ["serde_derive"] }
 serde_json = "1.0.113"
 async-trait = "0.1.77"
+web-sys = { version = "0.3.67", features = [
+  "HtmlElement",
+  "Text",
+  "Window",
+  "Document",
+  "Element",
+  "Node",
+  "console",
+  "TreeWalker",
+  "Comment",
+  "CharacterData",
+] }
