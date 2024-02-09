@@ -197,10 +197,13 @@ fn bind_node(component: &(impl Component + ?Sized), node: &Node) -> Result<(), J
                 document.create_tree_walker_with_what_to_show(host_component, SHOW_COMMENT)?;
             replace_expression_comments(&comments_walker, id, expr)?;
             // And again for its shadow root template
-            let shadow_root = host_component.shadow_root().expect("No shadow root");
-            let comments_walker = document
-                .create_tree_walker_with_what_to_show(&shadow_root.get_root_node(), SHOW_COMMENT)?;
-            replace_expression_comments(&comments_walker, id, expr)?;
+            if let Some(shadow_root) = host_component.shadow_root() {
+                let comments_walker = document.create_tree_walker_with_what_to_show(
+                    &shadow_root.get_root_node(),
+                    SHOW_COMMENT,
+                )?;
+                replace_expression_comments(&comments_walker, id, expr)?;
+            }
             Ok(())
         }
     }
