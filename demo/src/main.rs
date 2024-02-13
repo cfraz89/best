@@ -8,6 +8,7 @@ use axum::{
 use demo_index::IndexPage;
 use elementary_rs_lib::page::Page;
 use tower_http::services::ServeDir;
+use wasm_bindgen::prelude::*;
 
 #[tokio::main]
 async fn main() {
@@ -27,13 +28,14 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    let page = IndexPage {
-        x: 20,
-        _selector: Default::default(),
-        _context: Default::default(),
-    }
-    .render()
-    .await
-    .expect("Render page didnt return!");
+    let page = IndexPage { x: 20 }
+        .render()
+        .await
+        .expect("Render page didnt return!");
     Html(page)
+}
+
+#[wasm_bindgen(start)]
+async fn start() -> Result<(), JsValue> {
+    elementary_rs_lib::init::elementary_init()
 }

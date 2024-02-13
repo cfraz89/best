@@ -2,8 +2,8 @@ use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc}
 
 use crate::{context::ComponentContext, selector::Selector};
 use async_trait::async_trait;
-use web_sys::{wasm_bindgen::JsCast, Comment, TreeWalker};
-use web_sys::{wasm_bindgen::JsValue, window};
+use wasm_bindgen::prelude::*;
+use web_sys::{window, Comment, TreeWalker};
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createTreeWalker
 /// Ashamedly had to reference leptos here

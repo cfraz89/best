@@ -3,6 +3,7 @@
 mod component;
 mod hydrate;
 mod node;
+mod page;
 mod template_node;
 
 use proc_macro::TokenStream;
@@ -15,6 +16,11 @@ pub fn hydrate(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     component::component(attr, item)
+}
+
+#[proc_macro_attribute]
+pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
+    page::page(attr, item)
 }
 
 #[proc_macro]

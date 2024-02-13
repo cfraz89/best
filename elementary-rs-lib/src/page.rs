@@ -23,6 +23,26 @@ cfg_if::cfg_if! {
             }
         }
     } else {
-        pub trait Page: Component + serde::de::DeserializeOwned {}
+    pub trait Page: Component + serde::de::DeserializeOwned {}
+
+        use crate::node::{ServerDataMap};
+        use gloo_utils::format::JsValueSerdeExt;
+        use serde::Deserialize;
+        use wasm_bindgen::JsValue;
+
+        pub async fn hydrate<T: Component + for<'a> Deserialize<'a>>(
+            serial_page: JsValue,
+            serial_server_data_map: JsValue,
+        ) -> Result<(), JsValue> {
+            let page: T = serial_page
+                .into_serde()
+                .expect("Could not deserialize initial value!");
+            let server_data_map: ServerDataMap = serial_server_data_map
+                .into_serde()
+                .expect("Could not deserialize initial value!");
+            page.reified_view(Some(&server_data_map)).await?;
+            page.bind()?;
+            Ok(())
+        }
     }
 }

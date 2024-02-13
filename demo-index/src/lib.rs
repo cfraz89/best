@@ -1,37 +1,15 @@
+mod my_h1;
+
 use elementary_rs_lib::{
     node::{Node, View},
     page::Page,
 };
-use elementary_rs_macros::{component, hydrate, node};
-use wasm_bindgen::prelude::*;
+use elementary_rs_macros::{node, page};
+use my_h1::MyH1;
 
-#[wasm_bindgen(start)]
-pub async fn init_document() -> Result<(), JsValue> {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    Ok(())
-}
-
-#[component]
+#[page]
 pub struct IndexPage {
     pub x: i32,
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(target_arch = "wasm32")] {
-        use gloo_utils::format::JsValueSerdeExt;
-        use elementary_rs_lib::node::ServerDataMap;
-        use elementary_rs_lib::node::Component;
-
-        #[wasm_bindgen]
-        pub async fn render(serial_page: JsValue, serial_server_data_map: JsValue) -> Result<(), JsValue> {
-            let page: IndexPage = serial_page.into_serde().expect("Could not deserialize initial value!");
-            let server_data_map: ServerDataMap = serial_server_data_map.into_serde().expect("Could not deserialize initial value!");
-            web_sys::console::log_1(&"Got here".into());
-            page.reified_view(Some(&server_data_map)).await?;
-            page.bind();
-            Ok(())
-        }
-    }
 }
 
 impl View for IndexPage {
@@ -50,30 +28,6 @@ impl View for IndexPage {
 impl Page for IndexPage {
     #[cfg(not(target_arch = "wasm32"))]
     fn wasm_path(&self) -> &'static str {
-        "./wasm/demo_index.js"
-    }
-}
-// #[derive(ComponentSupport)]
-#[component]
-pub struct MyH1 {}
-
-// #[async_trait]
-impl View for MyH1 {
-    async fn build(&self) -> Node {
-        let title = self.my_title().await;
-        node! {
-            <div>
-                <h1>{title}</h1>
-                <div>Hi</div>
-                <slot />
-            </div>
-        }
-    }
-}
-
-impl MyH1 {
-    #[hydrate]
-    async fn my_title(&self) -> String {
-        "Server title".to_string()
+        "./demo-index/pkg/demo_index.js"
     }
 }
