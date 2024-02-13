@@ -1,9 +1,8 @@
-use elementary_rs_lib::node::Component;
 use elementary_rs_lib::{
-    node::{Node, ServerDataMap, View},
+    node::{Node, View},
     page::Page,
 };
-use elementary_rs_macros::{component, node, server};
+use elementary_rs_macros::{component, hydrate, node};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -20,12 +19,15 @@ pub struct IndexPage {
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
         use gloo_utils::format::JsValueSerdeExt;
+        use elementary_rs_lib::node::ServerDataMap;
+        use elementary_rs_lib::node::Component;
+
         #[wasm_bindgen]
         pub async fn render(serial_page: JsValue, serial_server_data_map: JsValue) -> Result<(), JsValue> {
             let page: IndexPage = serial_page.into_serde().expect("Could not deserialize initial value!");
             let server_data_map: ServerDataMap = serial_server_data_map.into_serde().expect("Could not deserialize initial value!");
             web_sys::console::log_1(&"Got here".into());
-            page.reified_view(Some(&server_data_map)).await;
+            page.reified_view(Some(&server_data_map)).await?;
             page.bind();
             Ok(())
         }
@@ -70,7 +72,7 @@ impl View for MyH1 {
 }
 
 impl MyH1 {
-    #[server]
+    #[hydrate]
     async fn my_title(&self) -> String {
         "Server title".to_string()
     }

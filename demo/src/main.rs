@@ -26,7 +26,7 @@ async fn main() {
 }
 
 #[axum::debug_handler]
-async fn root() -> Html<String> {
+async fn root() -> impl IntoResponse {
     let page = IndexPage {
         x: 20,
         _selector: Default::default(),

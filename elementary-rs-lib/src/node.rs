@@ -140,9 +140,9 @@ async fn reify_node(
             element,
             child_nodes,
         } => {
-            element.reified_view(server_data_map).await;
+            element.reified_view(server_data_map).await?;
             for child in child_nodes.iter() {
-                reify_node(child, server_data_map).await;
+                reify_node(child, server_data_map).await?;
             }
             Ok(())
         }
@@ -151,7 +151,7 @@ async fn reify_node(
             child_nodes,
         } => {
             for child in child_nodes.iter() {
-                reify_node(child, server_data_map).await;
+                reify_node(child, server_data_map).await?;
             }
             Ok(())
         }
@@ -307,10 +307,10 @@ fn serialize_node(component: &(impl Component + ?Sized), node: &Node, into: &mut
 
 pub type ServerDataMap = HashMap<String, HashMap<String, serde_json::Value>>;
 
-const NO_SELF_CLOSE_TAGS: &[&str] = &["slot"];
-
 cfg_if::cfg_if! {
     if #[cfg(not(target_arch = "wasm32"))] {
+        const NO_SELF_CLOSE_TAGS: &[&str] = &["slot"];
+
         use std::fmt::{Write};
         use async_recursion::async_recursion;
         impl Node {
