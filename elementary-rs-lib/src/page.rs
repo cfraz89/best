@@ -5,10 +5,11 @@ cfg_if::cfg_if! {
         use crate::selector::Selector;
 
         pub trait Page: Component + serde::Serialize + Sized {
-            fn wasm_path(&self) -> &'static str;
+            fn js_path(&self) -> &'static str;
+            fn hydration_fn_name(&self) -> &'static str;
 
             async fn render(&self) -> Result<String, serde_json::Error> {
-                let wasm_path = self.wasm_path();
+                let wasm_path = self.js_path();
                 let rendered_node = self.reified_view(None).await.unwrap().render().await.expect("Render didnt give any output!");
                 let serial_page = serde_json::to_string(self)?;
                 let server_data = serde_json::to_string(&self.serialize_server_data())?;
@@ -16,8 +17,9 @@ cfg_if::cfg_if! {
                                         Selector::Id(id) => format!("id=\"_{id}\""),
                                         Selector::Class(class) => format!("class=\"_{class}\""),
                                     };
+                let hydration_fn = self.hydration_fn_name();
                 Ok(format!(
-                    "<!doctype html><html><head></head><body {selector}>{rendered_node}<script type=\"module\">import start, {{ render }} from \"{wasm_path}\"; await start(); await render({serial_page}, {server_data});</script></body></html>",
+                    "<!doctype html><html><head></head><body {selector}>{rendered_node}<script type=\"module\">import start, {{ {hydration_fn} }} from \"{wasm_path}\"; await start(); await {hydration_fn}({serial_page}, {server_data});</script></body></html>",
 
                 ))
             }

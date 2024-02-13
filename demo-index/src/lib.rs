@@ -7,7 +7,7 @@ use elementary_rs_lib::{
 use elementary_rs_macros::{node, page};
 use my_h1::MyH1;
 
-#[page]
+#[page(js_path = "./wasm/demo_index.js")]
 pub struct IndexPage {
     pub x: i32,
 }
@@ -22,12 +22,5 @@ impl View for IndexPage {
                 </MyH1>
             </div>
         )
-    }
-}
-
-impl Page for IndexPage {
-    #[cfg(not(target_arch = "wasm32"))]
-    fn wasm_path(&self) -> &'static str {
-        "./demo-index/pkg/demo_index.js"
     }
 }

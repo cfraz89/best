@@ -1,13 +1,39 @@
+use darling::ast::NestedMeta;
+use darling::{Error, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Ident, ItemStruct};
 
-pub fn page(_attr: TokenStream, item: TokenStream) -> TokenStream {
+#[derive(Default, FromMeta)]
+#[darling(default)]
+pub struct PageArgs {
+    js_path: String,
+}
+
+pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_struct = parse_macro_input!(item as ItemStruct);
+
+    let attr_args = match NestedMeta::parse_meta_list(attr.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(Error::from(e).write_errors());
+        }
+    };
+    let PageArgs { js_path } = match PageArgs::from_list(&attr_args) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(e.write_errors());
+        }
+    };
+
+    if js_path.is_empty() {
+        return TokenStream::from(Error::custom("js_path is required").write_errors());
+    }
 
     let ident = item_struct.ident.clone();
     let lower_ident = ident.to_string().to_ascii_lowercase();
-    let hydrate_ident = Ident::new(&format!("hydrate_{lower_ident}"), ident.span());
+    let hydrate_str = format!("hydrate_{lower_ident}");
+    let hydrate_ident = Ident::new(&hydrate_str, ident.span());
     let context_ident = Ident::new(&format!("_context_{ident}").to_uppercase(), ident.span());
     let selector_ident = Ident::new(&format!("_selector_{ident}").to_uppercase(), ident.span());
     let ident_string = format!("page-{lower_ident}",);
@@ -38,6 +64,19 @@ pub fn page(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl elementary_rs_lib::node::Component for #ident {}
+
+        impl Page for #ident {
+            #[cfg(not(target_arch = "wasm32"))]
+            fn js_path(&self) -> &'static str {
+                #js_path
+            }
+
+            #[cfg(not(target_arch = "wasm32"))]
+            fn hydration_fn_name(&self) -> &'static str {
+                #hydrate_str
+            }
+        }
+
 
         #[cfg(target_arch = "wasm32")]
         #[wasm_bindgen::prelude::wasm_bindgen]
