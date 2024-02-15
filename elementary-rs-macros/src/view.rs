@@ -4,7 +4,7 @@ use quote::ToTokens;
 use std::{collections::HashMap, iter::Peekable, sync::Arc};
 
 /// Parse a html-like template into a TemplateNode. Then emit its token stream, which will generate a Node
-pub fn node(input: TokenStream) -> TokenStream {
+pub fn view(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
     match parse_node(iter) {
         Ok(node) => node.to_token_stream().into(),

@@ -37,7 +37,7 @@ impl ToTokens for TemplateNode {
         {
             tokens.extend(match self {
                 TemplateNode::HtmlElement {
-                    element: HtmlElement { tag, attributes: _},
+                    element: HtmlElement { tag, attributes: _ },
                     child_nodes,
                 } => {
                     quote! {
@@ -67,15 +67,19 @@ impl ToTokens for TemplateNode {
                         #k: #v
                         }
                     });
+                    let tag = format!("component-{}", name.to_string().to_ascii_lowercase());
                     quote! {
                         elementary_rs_lib::node::Node::Component {
-                            element: Box::new(
-                                #name_ident {
-                                    _context: std::default::Default::default(),
-                                    _selector: elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
-                                    #(#properties),*
-                                }
-                            ),
+                            entity: elementary_rs_lib::world::WORLD.spawn((
+                                elementary_rs_lib::node::AnyComponent::from(
+                                    #name_ident {
+                                        #(#properties),*
+                                    }
+                                ),
+                                elementary_rs_lib::context::Context::default(),
+                                elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
+                                elementary_rs_lib::tag::Tag(#tag.to_string())
+                            )).id(),
                             child_nodes: std::sync::Arc::new(vec![#(#child_nodes),*])
                         }
                     }
@@ -83,12 +87,16 @@ impl ToTokens for TemplateNode {
                 }
                 TemplateNode::Expression(tokens) => {
                     let mut hasher = DefaultHasher::new();
-                tokens.to_string().hash(&mut hasher);
-                //Adding the e to make it a valid identifier
-                let hash = hasher.finish();
-                quote! {
-                    elementary_rs_lib::node::Node::Expression(#hash.to_string(), Box::new(move || (#tokens).to_string())).into()
-                }},
+                    tokens.to_string().hash(&mut hasher);
+                    //Adding the e to make it a valid identifier
+                    let hash = hasher.finish();
+                    quote! {
+                        elementary_rs_lib::node::Node::Expression(#hash.to_string(), Box::new({
+                            let _self = self.clone();
+                            move || (#tokens).to_string()
+                    })).into()
+                    }
+                }
             })
         }
     }

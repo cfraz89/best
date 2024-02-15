@@ -2,9 +2,9 @@
 #![feature(proc_macro_diagnostic)]
 mod component;
 mod hydrate;
-mod node;
 mod page;
 mod template_node;
+mod view;
 
 use proc_macro::TokenStream;
 
@@ -24,6 +24,6 @@ pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn node(input: TokenStream) -> TokenStream {
-    node::node(input)
+pub fn view(input: TokenStream) -> TokenStream {
+    view::view(input)
 }

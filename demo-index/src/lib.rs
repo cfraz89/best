@@ -3,6 +3,7 @@ mod my_h1;
 use elementary_rs_lib::{
     node::{Node, View},
     page::Page,
+    signal::Signal,
 };
 use elementary_rs_macros::{node, page};
 use my_h1::MyH1;
@@ -13,12 +14,11 @@ pub struct IndexPage {
 }
 
 impl View for IndexPage {
-    async fn build(&self) -> Node {
-        let x = self.x;
-        node!(
+    async fn build(&self) -> Entity {
+        view!(
             <div>
                 <MyH1>
-                    {x * 10}
+                    // {*self.x.get() * 10}
                 </MyH1>
             </div>
         )

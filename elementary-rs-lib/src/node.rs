@@ -1,7 +1,13 @@
-use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc};
+use std::{collections::HashMap, future::Future, pin::Pin};
 
-use crate::{context::ComponentContext, selector::Selector};
-use async_trait::async_trait;
+use crate::{
+    selector::Selector,
+    server_data::{SerialServerData, ServerData},
+    tag::Tag,
+    world::WORLD,
+};
+use bevy_ecs::entity::Entity;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use web_sys::{window, Comment, TreeWalker};
 
@@ -9,51 +15,23 @@ use web_sys::{window, Comment, TreeWalker};
 /// Ashamedly had to reference leptos here
 const SHOW_COMMENT: u32 = 0x80;
 
+#[derive(bevy_ecs::component::Component)]
 pub enum Node {
     Text(String),
     HtmlElement {
         element: HtmlElement,
-        child_nodes: Arc<Vec<Node>>,
+        child_nodes: Vec<Node>,
     },
     Component {
-        element: Box<dyn Component>,
-        child_nodes: Arc<Vec<Node>>,
+        entity: Entity,
+        child_nodes: Vec<Node>,
     },
     Expression(String, Box<dyn Fn() -> String + Send + Sync>),
 }
 
-impl Debug for Node {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Node::Text(string) => write!(f, "Text: {}", string),
-            Node::HtmlElement {
-                element: HtmlElement { tag, attributes: _ },
-                child_nodes,
-            } => write!(f, "HtmlElement: {:?} {{ {:?} }}", tag, child_nodes),
-            Node::Component {
-                element,
-                child_nodes,
-            } => write!(
-                f,
-                "Component {:?}: {:?} {{ {:?} }}",
-                element.tag(),
-                element.selector(),
-                child_nodes
-            ),
-            Node::Expression(id, _) => write!(f, "Expression: {}", id),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct HtmlElement {
     pub tag: String,
     pub attributes: HashMap<String, String>,
-}
-
-pub trait ComponentTag {
-    fn selector(&self) -> &Selector;
-    fn tag(&self) -> &'static str;
 }
 
 // #[async_trait]
@@ -71,78 +49,55 @@ impl<T: View<build(): Send>> DynView for T {
     }
 }
 
-#[async_trait]
-pub trait Component: DynView + ComponentContext + ComponentTag + Send + Sync {
-    fn serialize_server_data(&self) -> ServerDataMap {
-        let mut server_data_map = HashMap::new();
-        server_data_map.insert(
-            self.selector().to_string(),
-            self.context().server_data.lock().unwrap().clone(),
-        );
-        serialize_node(
-            self,
-            self.context()
-                .view
-                .get()
-                .expect("Can't serialize before view is built"),
-            &mut server_data_map,
-        );
-        server_data_map
-    }
+#[derive(bevy_ecs::component::Component)]
+pub struct AnyView(Box<dyn DynView + Sync + Send>);
 
-    /// Bind closure expressions to wasm
-    fn bind(&self) -> Result<(), JsValue> {
-        web_sys::console::log_1(&format!("Binding component {:?}", self.selector()).into());
-        let view = self
-            .context()
-            .view
-            .get()
-            .expect("Cannot bind before view is reified");
-        bind_node(self, view)
+impl<T: View<build(): Send> + Sync + Send> From<T> for AnyView {
+    fn from(component: T) -> Self {
+        AnyView(Box::new(component))
     }
+}
 
-    /// Construct the view and put it into context, returning it
-    async fn reified_view(
-        &self,
-        server_data_map: Option<&ServerDataMap>,
-    ) -> Result<&Node, JsValue> {
-        #[cfg(target_arch = "wasm32")]
-        web_sys::console::log_1(&format!("reifying {}\n\n\n", self.selector()).into());
-        let context = self.context();
-        if let Some(server_data_map) = server_data_map {
-            *context.server_data.lock().unwrap() = server_data_map
-                .get(&self.selector().to_string())
-                .expect(&format!(
-                    "Server data for component {} missing",
-                    self.selector().to_string()
-                ))
-                .clone();
+/// Construct the view and put it into the ecs
+pub async fn construct_entity_view(
+    entity: &Entity,
+    serial_server_data: Option<SerialServerData>,
+) -> Result<(), JsValue> {
+    let mut world = WORLD.write().unwrap();
+    let mut entity_ref = world.entity_mut(*entity);
+    let selector = entity_ref
+        .get::<Selector>()
+        .expect("Entity needs a selector");
+    if entity_ref.get::<ServerData>().is_none() {
+        if let Some(server_data) = serial_server_data.as_ref().and_then(|s| s.get(selector)) {
+            entity_ref.insert(server_data);
         }
-        if context.view.get().is_none() {
-            let built_view = self.build().await;
-            reify_node(&built_view, server_data_map).await?;
-            context
-                .view
-                .set(built_view)
-                .expect("Couldn't set oncelock for built_view");
-        }
-        Ok(context.view.get().unwrap())
     }
+    let node = entity_ref.get::<Node>();
+    if node.is_none() {
+        let view = entity_ref
+            .get::<AnyView>()
+            .expect("Entity should have a view");
+        let node = view.0.build().await;
+        construct_entity_view_with_node(entity, &node, serial_server_data).await?;
+        entity_ref.insert(node);
+    }
+    Ok(())
 }
 
 #[async_recursion::async_recursion]
-async fn reify_node(
+async fn construct_entity_view_with_node(
+    entity: &Entity,
     node: &Node,
-    server_data_map: Option<&'async_recursion ServerDataMap>,
+    serial_server_data: Option<SerialServerData>,
 ) -> Result<(), JsValue> {
     match node {
         Node::Component {
-            element,
+            entity,
             child_nodes,
         } => {
-            element.reified_view(server_data_map).await?;
             for child in child_nodes.iter() {
-                reify_node(child, server_data_map).await?;
+                construct_entity_view_with_node(entity, child, serial_server_data).await?;
             }
             Ok(())
         }
@@ -151,35 +106,7 @@ async fn reify_node(
             child_nodes,
         } => {
             for child in child_nodes.iter() {
-                reify_node(child, server_data_map).await?;
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    }
-}
-
-fn bind_node(component: &(impl Component + ?Sized), node: &Node) -> Result<(), JsValue> {
-    match node {
-        Node::Text(_) => Ok(()),
-        Node::HtmlElement {
-            element: _,
-            child_nodes,
-        } => {
-            for child in child_nodes.iter() {
-                web_sys::console::log_1(&format!("iterating child {:?}", child).into());
-                bind_node(component, child)?;
-            }
-            Ok(())
-        }
-        Node::Component {
-            element,
-            child_nodes,
-        } => {
-            element.bind()?;
-            for child in child_nodes.iter() {
-                web_sys::console::log_1(&format!("iterating child {:?}", child).into());
-                bind_node(component, child)?;
+                construct_entity_view_with_node(entity, child, serial_server_data).await?;
             }
             Ok(())
         }
@@ -189,8 +116,14 @@ fn bind_node(component: &(impl Component + ?Sized), node: &Node) -> Result<(), J
                 .document()
                 .expect("no document");
             web_sys::console::log_1(&format!("Binding expression {:?}", id).into());
+            let mut world = WORLD.read().unwrap();
+            let entity_ref = world.entity(*entity);
+            let selector = entity_ref
+                .get::<Selector>()
+                .expect("Entity needs a selector");
+            drop(world);
             let host_component = &document
-                .query_selector(&component.selector().to_string())?
+                .query_selector(&selector.to_string())?
                 .expect("id should exist");
             // We walk the host component to query its child nodes
             let comments_walker =
@@ -206,6 +139,7 @@ fn bind_node(component: &(impl Component + ?Sized), node: &Node) -> Result<(), J
             }
             Ok(())
         }
+        _ => Ok(()),
     }
 }
 
@@ -278,35 +212,6 @@ fn replace_between_comments(
     Ok(())
 }
 
-/// Walk the tree and push server data
-fn serialize_node(component: &(impl Component + ?Sized), node: &Node, into: &mut ServerDataMap) {
-    match node {
-        Node::Component {
-            element,
-            child_nodes,
-        } => {
-            into.insert(
-                element.selector().to_string(),
-                element.context().server_data.lock().unwrap().clone(),
-            );
-            for child in child_nodes.iter() {
-                serialize_node(component, child, into);
-            }
-        }
-        Node::HtmlElement {
-            element: _,
-            child_nodes,
-        } => {
-            for child in child_nodes.iter() {
-                serialize_node(component, child, into);
-            }
-        }
-        _ => {}
-    }
-}
-
-pub type ServerDataMap = HashMap<String, HashMap<String, serde_json::Value>>;
-
 cfg_if::cfg_if! {
     if #[cfg(not(target_arch = "wasm32"))] {
         const NO_SELF_CLOSE_TAGS: &[&str] = &["slot"];
@@ -343,24 +248,29 @@ cfg_if::cfg_if! {
                         Ok(output)
                     }
                     Node::Component {
-                        element,
+                        entity,
                         child_nodes,
                     } => {
+                        let mut world = WORLD.read().unwrap();
+                        let entity_ref = world.entity(*entity);
+                        let tag = entity_ref.get::<Tag>().expect("No tag on entity");
+                        let selector = entity_ref.get::<Selector>().expect("No selector on entity");
+                        let view = entity_ref.get::<AnyView>().expect("No view on enttiy");
                         let mut output = String::new();
                         write!(
                             output,
                             "<{} {}><template shadowrootmode=\"open\">{}</template>",
-                            element.tag(),
-                            match element.selector() {
+                            tag.0,
+                            match selector {
                                 Selector::Id(id) => format!("id=\"_{id}\""),
                                 Selector::Class(class) => format!("class=\"_{class}\""),
                             },
-                            element.reified_view(None).await.unwrap().render().await?
+                            view.0.build().await.render().await?
                         )?;
                         for child in child_nodes.iter() {
                             output.write_str(child.render().await?.as_str())?;
                         }
-                        write!(output, "</{}>", element.tag())?;
+                        write!(output, "</{}>", tag.0)?;
                         Ok(output)
                     }
                     //We place comments around our templated expression so that we can locate it for hydration

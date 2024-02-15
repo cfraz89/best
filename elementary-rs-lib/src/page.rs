@@ -1,29 +1,45 @@
-use crate::node::Component;
+use bevy_ecs::{component::Component, entity::Entity};
+
+use crate::{
+    hydration_fn_name::{self, HydrationFnName},
+    js_path::{self, JSPath},
+    node::{construct_entity_view, AnyView, Node, View},
+    server_data::{SerialServerData, ServerData},
+    world::WORLD,
+};
 
 cfg_if::cfg_if! {
     if #[cfg(not(target_arch = "wasm32"))] {
         use crate::selector::Selector;
 
-        pub trait Page: Component + serde::Serialize + Sized {
-            fn js_path(&self) -> &'static str;
-            fn hydration_fn_name(&self) -> &'static str;
+        pub trait Page: View + serde::Serialize {
+            fn create_entity(&self) -> Entity;
 
             async fn render(&self) -> Result<String, serde_json::Error> {
-                let wasm_path = self.js_path();
-                let rendered_node = self.reified_view(None).await.unwrap().render().await.expect("Render didnt give any output!");
-                let serial_page = serde_json::to_string(self)?;
-                let server_data = serde_json::to_string(&self.serialize_server_data())?;
-                let selector = match self.selector() {
+                let world = WORLD.read().unwrap();
+                //written out by macro
+                let entity = self.create_entity();
+                let entity_ref = WORLD.read().unwrap().entity(entity);
+                let JSPath(js_path) = entity_ref.get().expect("Entity needs a js path");
+                let HydrationFnName(hydration_fn_name) = entity_ref.get().expect("Entity needs a js path");
+                let selector = entity_ref.get().expect("Entity needs a selector");
+                construct_entity_view(entity, None).await.expect("failed constructing view");
+                let rendered_node = entity_ref.get::<Node>().expect("page has no node").render().await.expect("Render didnt give any output!");
+                let view = entity_re`f.get::<AnyView>().expect("page has no view");
+                let serial_page = serde_json::to_string(view)?;
+                let SerialServerData(server_data) = ServerData::get_serial_server_data(entity);
+                let server_data = serde_json::to_string(&server_data)?;
+                let selector_attr = match selector {
                                         Selector::Id(id) => format!("id=\"_{id}\""),
                                         Selector::Class(class) => format!("class=\"_{class}\""),
                                     };
-                let hydration_fn = self.hydration_fn_name();
                 Ok(format!(
-                    "<!doctype html><html><head></head><body {selector}>{rendered_node}<script type=\"module\">import start, {{ {hydration_fn} }} from \"{wasm_path}\"; await start(); await {hydration_fn}({serial_page}, {server_data});</script></body></html>",
+                    "<!doctype html><html><head></head><body {selector_attr}>{rendered_node}<script type=\"module\">import start, {{ {hydration_fn_name} }} from \"{js_path}\"; await start(); await {hydration_fn_name}({serial_page}, {server_data});</script></body></html>",
 
                 ))
             }
         }
+
     } else {
     pub trait Page: Component + serde::de::DeserializeOwned {}
 
