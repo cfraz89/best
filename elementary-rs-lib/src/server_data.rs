@@ -21,9 +21,10 @@ impl ServerData {
             .get::<ServerData>()
             .expect("Need server data on entity");
         let mut server_data_map = HashMap::new();
-        server_data_map.insert(selector.to_string(), server_data.0);
-        push_node_server_data(&mut SerialServerData(server_data_map), node);
-        SerialServerData(server_data_map)
+        server_data_map.insert(selector.to_string(), server_data.0.clone());
+        let mut serial_map = SerialServerData(server_data_map);
+        push_node_server_data(&mut serial_map, node);
+        serial_map
     }
 }
 
@@ -54,6 +55,7 @@ fn push_node_server_data(into: &mut SerialServerData, node: &Node) {
 
 #[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize, Debug))]
 #[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize, Debug))]
+#[derive(Clone)]
 pub struct SerialServerData(pub HashMap<String, HashMap<String, serde_json::Value>>);
 
 impl SerialServerData {

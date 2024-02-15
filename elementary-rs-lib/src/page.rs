@@ -1,6 +1,7 @@
-use bevy_ecs::{component::Component, entity::Entity};
+use bevy_ecs::entity::Entity;
 
 use crate::{
+    component::Component,
     hydration_fn_name::{self, HydrationFnName},
     js_path::{self, JSPath},
     node::{construct_entity_view, AnyView, Node, View},
@@ -12,22 +13,19 @@ cfg_if::cfg_if! {
     if #[cfg(not(target_arch = "wasm32"))] {
         use crate::selector::Selector;
 
-        pub trait Page: View + serde::Serialize {
-            fn create_entity(&self) -> Entity;
-
-            async fn render(&self) -> Result<String, serde_json::Error> {
+        pub trait Page: Component {
+            async fn render(self) -> Result<String, serde_json::Error> {
+                let serial_page = serde_json::to_string(&self)?;
                 let world = WORLD.read().unwrap();
                 //written out by macro
-                let entity = self.create_entity();
-                let entity_ref = WORLD.read().unwrap().entity(entity);
+                let entity = self.build_entity();
+                let entity_ref = world.entity(entity);
                 let JSPath(js_path) = entity_ref.get().expect("Entity needs a js path");
                 let HydrationFnName(hydration_fn_name) = entity_ref.get().expect("Entity needs a js path");
                 let selector = entity_ref.get().expect("Entity needs a selector");
-                construct_entity_view(entity, None).await.expect("failed constructing view");
+                construct_entity_view(&entity, None).await.expect("failed constructing view");
                 let rendered_node = entity_ref.get::<Node>().expect("page has no node").render().await.expect("Render didnt give any output!");
-                let view = entity_re`f.get::<AnyView>().expect("page has no view");
-                let serial_page = serde_json::to_string(view)?;
-                let SerialServerData(server_data) = ServerData::get_serial_server_data(entity);
+                let SerialServerData(server_data) = ServerData::get_serial_server_data(&entity);
                 let server_data = serde_json::to_string(&server_data)?;
                 let selector_attr = match selector {
                                         Selector::Id(id) => format!("id=\"_{id}\""),

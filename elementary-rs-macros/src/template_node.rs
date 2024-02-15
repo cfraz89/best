@@ -46,7 +46,7 @@ impl ToTokens for TemplateNode {
                                 tag: #tag.to_string(),
                                 attributes: Default::default(),
                             },
-                            child_nodes: std::sync::Arc::new(vec![#(#child_nodes),*])
+                            child_nodes: vec![#(#child_nodes),*]
                         }
                     }
                 }
@@ -58,29 +58,18 @@ impl ToTokens for TemplateNode {
                     element: ComponentElement { name, properties },
                     child_nodes,
                 } => {
-                    let mut hasher = DefaultHasher::new();
-                    tokens.to_string().hash(&mut hasher);
-                    let hash = hasher.finish();
                     let name_ident = format_ident!("{}", name);
                     let properties = properties.iter().map(|(k, v)| {
                         quote! {
                         #k: #v
                         }
                     });
-                    let tag = format!("component-{}", name.to_string().to_ascii_lowercase());
                     quote! {
                         elementary_rs_lib::node::Node::Component {
-                            entity: elementary_rs_lib::world::WORLD.spawn((
-                                elementary_rs_lib::node::AnyComponent::from(
-                                    #name_ident {
+                            entity: elementary_rs_lib::component::Component::build_entity(#name_ident {
                                         #(#properties),*
-                                    }
-                                ),
-                                elementary_rs_lib::context::Context::default(),
-                                elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
-                                elementary_rs_lib::tag::Tag(#tag.to_string())
-                            )).id(),
-                            child_nodes: std::sync::Arc::new(vec![#(#child_nodes),*])
+                                    }),
+                            child_nodes: vec![#(#child_nodes),*]
                         }
                     }
                     .into()

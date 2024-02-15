@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future, pin::Pin};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
 use crate::{
     selector::Selector,
@@ -49,12 +49,12 @@ impl<T: View<build(): Send>> DynView for T {
     }
 }
 
-#[derive(bevy_ecs::component::Component)]
-pub struct AnyView(Box<dyn DynView + Sync + Send>);
+#[derive(bevy_ecs::component::Component, Clone)]
+pub struct AnyView(pub Arc<dyn DynView + Sync + Send>);
 
-impl<T: View<build(): Send> + Sync + Send> From<T> for AnyView {
+impl<T: View<build(): Send> + Sync + Send + 'static> From<T> for AnyView {
     fn from(component: T) -> Self {
-        AnyView(Box::new(component))
+        AnyView(Arc::new(component))
     }
 }
 
@@ -97,7 +97,7 @@ async fn construct_entity_view_with_node(
             child_nodes,
         } => {
             for child in child_nodes.iter() {
-                construct_entity_view_with_node(entity, child, serial_server_data).await?;
+                construct_entity_view_with_node(entity, child, serial_server_data.clone()).await?;
             }
             Ok(())
         }
@@ -106,7 +106,7 @@ async fn construct_entity_view_with_node(
             child_nodes,
         } => {
             for child in child_nodes.iter() {
-                construct_entity_view_with_node(entity, child, serial_server_data).await?;
+                construct_entity_view_with_node(entity, child, serial_server_data.clone()).await?;
             }
             Ok(())
         }
@@ -116,15 +116,15 @@ async fn construct_entity_view_with_node(
                 .document()
                 .expect("no document");
             web_sys::console::log_1(&format!("Binding expression {:?}", id).into());
-            let mut world = WORLD.read().unwrap();
+            let world = WORLD.read().unwrap();
             let entity_ref = world.entity(*entity);
             let selector = entity_ref
                 .get::<Selector>()
                 .expect("Entity needs a selector");
-            drop(world);
             let host_component = &document
                 .query_selector(&selector.to_string())?
                 .expect("id should exist");
+            drop(world);
             // We walk the host component to query its child nodes
             let comments_walker =
                 document.create_tree_walker_with_what_to_show(host_component, SHOW_COMMENT)?;
@@ -251,26 +251,34 @@ cfg_if::cfg_if! {
                         entity,
                         child_nodes,
                     } => {
-                        let mut world = WORLD.read().unwrap();
+                        let mut output = String::new();
+                        let outer_view: Arc<dyn DynView + Send + Sync>;
+                        let outer_selector_attr: String;
+                        let outer_tag: String;
+                        {
+                        let world = WORLD.read().unwrap();
                         let entity_ref = world.entity(*entity);
                         let tag = entity_ref.get::<Tag>().expect("No tag on entity");
                         let selector = entity_ref.get::<Selector>().expect("No selector on entity");
                         let view = entity_ref.get::<AnyView>().expect("No view on enttiy");
-                        let mut output = String::new();
+                        outer_tag = tag.0.clone();
+                        outer_view = view.0.clone();
+                        outer_selector_attr = match selector {
+                                Selector::Id(id) => format!("id=\"_{id}\""),
+                                Selector::Class(class) => format!("class=\"_{class}\""),
+                            };
+                        }
                         write!(
                             output,
                             "<{} {}><template shadowrootmode=\"open\">{}</template>",
-                            tag.0,
-                            match selector {
-                                Selector::Id(id) => format!("id=\"_{id}\""),
-                                Selector::Class(class) => format!("class=\"_{class}\""),
-                            },
-                            view.0.build().await.render().await?
+                            outer_tag,
+                            outer_selector_attr,
+                            outer_view.build().await.render().await?
                         )?;
                         for child in child_nodes.iter() {
                             output.write_str(child.render().await?.as_str())?;
                         }
-                        write!(output, "</{}>", tag.0)?;
+                        write!(output, "</{}>", outer_tag)?;
                         Ok(output)
                     }
                     //We place comments around our templated expression so that we can locate it for hydration

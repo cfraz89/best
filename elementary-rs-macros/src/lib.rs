@@ -13,9 +13,9 @@ pub fn hydrate(attr: TokenStream, item: TokenStream) -> TokenStream {
     hydrate::hydrate(attr, item)
 }
 
-#[proc_macro_attribute]
-pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
-    component::component(attr, item)
+#[proc_macro_derive(Component, attributes(page))]
+pub fn component(input: TokenStream) -> TokenStream {
+    component::component(input)
 }
 
 #[proc_macro_attribute]
