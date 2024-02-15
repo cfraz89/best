@@ -16,25 +16,35 @@ cfg_if::cfg_if! {
         pub trait Page: Component {
             async fn render(self) -> Result<String, serde_json::Error> {
                 let serial_page = serde_json::to_string(&self)?;
-                let world = WORLD.read().unwrap();
                 //written out by macro
                 let entity = self.build_entity();
-                let entity_ref = world.entity(entity);
-                let JSPath(js_path) = entity_ref.get().expect("Entity needs a js path");
-                let HydrationFnName(hydration_fn_name) = entity_ref.get().expect("Entity needs a js path");
-                let selector = entity_ref.get().expect("Entity needs a selector");
+                let outer_hydration_fn_name: String;
+                let outer_js_path: String;
+                {
+                    let world = WORLD.read().unwrap();
+                    let entity_ref = world.entity(entity);
+                    let JSPath(js_path) = entity_ref.get().expect("Entity needs a js path");
+                    outer_js_path = js_path.clone();
+                    let HydrationFnName(hydration_fn_name) = entity_ref.get().expect("Entity needs a js path");
+                    outer_hydration_fn_name = hydration_fn_name.clone();
+                }
                 construct_entity_view(&entity, None).await.expect("failed constructing view");
-                let rendered_node = entity_ref.get::<Node>().expect("page has no node").render().await.expect("Render didnt give any output!");
-                let SerialServerData(server_data) = ServerData::get_serial_server_data(&entity);
-                let server_data = serde_json::to_string(&server_data)?;
-                let selector_attr = match selector {
-                                        Selector::Id(id) => format!("id=\"_{id}\""),
-                                        Selector::Class(class) => format!("class=\"_{class}\""),
-                                    };
-                Ok(format!(
-                    "<!doctype html><html><head></head><body {selector_attr}>{rendered_node}<script type=\"module\">import start, {{ {hydration_fn_name} }} from \"{js_path}\"; await start(); await {hydration_fn_name}({serial_page}, {server_data});</script></body></html>",
+                {
+                    let world = WORLD.read().unwrap();
+                    let entity_ref = world.entity(entity);
+                    let rendered_node = entity_ref.get::<Node>().expect("page has no node").render().expect("Render didnt give any output!");
+                    let SerialServerData(server_data) = ServerData::get_serial_server_data(&entity);
+                    let server_data = serde_json::to_string(&server_data)?;
+                    let selector = entity_ref.get::<Selector>().to_owned().expect("Entity needs a selector");
+                    let selector_attr = match selector {
+                                            Selector::Id(id) => format!("id=\"_{id}\""),
+                                            Selector::Class(class) => format!("class=\"_{class}\""),
+                                        };
+                    Ok(format!(
+                        "<!doctype html><html><head></head><body {selector_attr}>{rendered_node}<script type=\"module\">import start, {{ {outer_hydration_fn_name} }} from \"{outer_js_path}\"; await start(); await {outer_hydration_fn_name}({serial_page}, {server_data});</script></body></html>",
 
-                ))
+                    ))
+                }
             }
         }
 

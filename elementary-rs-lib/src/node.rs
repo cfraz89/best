@@ -213,81 +213,72 @@ fn replace_between_comments(
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(not(target_arch = "wasm32"))] {
-        const NO_SELF_CLOSE_TAGS: &[&str] = &["slot"];
+if #[cfg(not(target_arch = "wasm32"))] {
+    const NO_SELF_CLOSE_TAGS: &[&str] = &["slot"];
 
-        use std::fmt::{Write};
-        use async_recursion::async_recursion;
-        impl Node {
-            /// Render the node to a string, for server side rendering
-            #[async_recursion]
-            pub async fn render(&self) -> Result<String, std::fmt::Error>{
-                match self {
-                    Node::Text(string) => Ok(string.to_owned()),
-                    Node::HtmlElement {
-                        element: HtmlElement { tag, attributes },
-                        child_nodes,
-                    } => {
-                        let mut output = String::new();
-                        let attributes_string = attributes
-                            .into_iter()
-                            .map(|(k, v)| format!(" {}=\"{}\"", k, v))
-                            .collect::<Vec<String>>()
-                            .join(" ");
-                        write!(output, "<{}{}", tag, attributes_string)?;
-                        // Some tags don't like self_closing
-                        if child_nodes.is_empty() && !NO_SELF_CLOSE_TAGS.contains(&tag.as_str()) {
-                            write!(output, " />")?;
-                        } else {
-                            write!(output, " >")?;
-                            for child in child_nodes.iter() {
-                                output.write_str(child.render().await?.as_str())?;
-                            }
-                            write!(output, "</{}>", tag)?;
-                        }
-                        Ok(output)
-                    }
-                    Node::Component {
-                        entity,
-                        child_nodes,
-                    } => {
-                        let mut output = String::new();
-                        let outer_view: Arc<dyn DynView + Send + Sync>;
-                        let outer_selector_attr: String;
-                        let outer_tag: String;
-                        {
-                        let world = WORLD.read().unwrap();
-                        let entity_ref = world.entity(*entity);
-                        let tag = entity_ref.get::<Tag>().expect("No tag on entity");
-                        let selector = entity_ref.get::<Selector>().expect("No selector on entity");
-                        let view = entity_ref.get::<AnyView>().expect("No view on enttiy");
-                        outer_tag = tag.0.clone();
-                        outer_view = view.0.clone();
-                        outer_selector_attr = match selector {
-                                Selector::Id(id) => format!("id=\"_{id}\""),
-                                Selector::Class(class) => format!("class=\"_{class}\""),
-                            };
-                        }
-                        write!(
-                            output,
-                            "<{} {}><template shadowrootmode=\"open\">{}</template>",
-                            outer_tag,
-                            outer_selector_attr,
-                            outer_view.build().await.render().await?
-                        )?;
+    use std::fmt::{Write};
+    impl Node {
+        pub fn render(&self) -> Result<String, std::fmt::Error> {
+            match self {
+                Node::Text(string) => Ok(string.to_owned()),
+                Node::HtmlElement {
+                    element: HtmlElement { tag, attributes },
+                    child_nodes,
+                } => {
+                    let mut output = String::new();
+                    let attributes_string = attributes
+                        .into_iter()
+                        .map(|(k, v)| format!(" {}=\"{}\"", k, v))
+                        .collect::<Vec<String>>()
+                        .join(" ");
+                    write!(output, "<{}{}", tag, attributes_string)?;
+                    // Some tags don't like self_closing
+                    if child_nodes.is_empty() && !NO_SELF_CLOSE_TAGS.contains(&tag.as_str()) {
+                        write!(output, " />")?;
+                    } else {
+                        write!(output, " >")?;
                         for child in child_nodes.iter() {
-                            output.write_str(child.render().await?.as_str())?;
+                            output.write_str(child.render()?.as_str())?;
                         }
-                        write!(output, "</{}>", outer_tag)?;
-                        Ok(output)
+                        write!(output, "</{}>", tag)?;
                     }
-                    //We place comments around our templated expression so that we can locate it for hydration
-                    Node::Expression(id, exp_fn) => {
-                        Ok(format!("<!--#exp:{id}-->{}<!--/exp:{id}-->", exp_fn()))
+                    Ok(output)
+                },
+                Node::Component {
+                    entity,
+                    child_nodes,
+                } => {
+                    let mut output = String::new();
+                    let world = WORLD.read().unwrap();
+                    let entity_ref = world.entity(*entity);
+                    let tag = entity_ref.get::<Tag>().expect("No tag on entity");
+                    let selector = entity_ref.get::<Selector>().expect("No selector on entity");
+                    let node = entity_ref.get::<Node>().expect("No node on enttiy");
+                    let selector_attr = match selector {
+                            Selector::Id(id) => format!("id=\"_{id}\""),
+                            Selector::Class(class) => format!("class=\"_{class}\""),
+                        };
+                    write!(
+                        output,
+                        "<{} {}><template shadowrootmode=\"open\">{}</template>",
+                        tag.0,
+                        selector_attr,
+                        node.render()?
+                    )?;
+                    for child in child_nodes.iter() {
+                        output.write_str(child.render()?.as_str())?;
+                    }
+                    write!(output, "</{}>", tag.0)?;
+                    Ok(output)
+                }
+                //We place comments around our templated expression so that we can locate it for hydration
+                Node::Expression(id, exp_fn) => {
+                    Ok(format!("<!--#exp:{id}-->{}<!--/exp:{id}-->", exp_fn()))
 
-                    }
                 }
             }
         }
     }
+}
+
 }
