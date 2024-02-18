@@ -54,26 +54,24 @@ cfg_if::cfg_if! {
         }
 
     } else {
+
+            use gloo_utils::format::JsValueSerdeExt;
+            use serde::de::Deserialize;
+            use wasm_bindgen::JsValue;
         pub trait Page: Component {
-
-            // use gloo_utils::format::JsValueSerdeExt;
-            // use serde::Deserialize;
-            // use wasm_bindgen::JsValue;
-
-            // pub async fn hydrate<T: Component + for<'a> Deserialize<'a>>(
-            //     serial_page: JsValue,
-            //     serial_server_data: JsValue,
-            // ) -> Result<(), JsValue> {
-                // let page: T = serial_page
-                //     .into_serde()
-                //     .expect("Could not deserialize initial value!");
-                // let serial_server_data: SerialServerData = serial_server_data
-                //     .into_serde()
-                //     .expect("Could not deserialize server data!");
-                // construct_entity_view(entity, serial_server_data).await?;
-                // page.bind()?;
-                // Ok(())
-            // }
+            async fn hydrate(
+                serial_page: JsValue,
+                serial_server_data: JsValue,
+            ) -> Result<(), JsValue> {
+                let page: Self = serial_page
+                    .into_serde()
+                    .expect("Could not deserialize initial value!");
+                let serial_server_data: SerialServerData = serial_server_data
+                    .into_serde()
+                    .expect("Could not deserialize server data!");
+                construct_entity_view(&page.build_entity(), Some(serial_server_data)).await?;
+                Ok(())
+            }
         }
     }
 }

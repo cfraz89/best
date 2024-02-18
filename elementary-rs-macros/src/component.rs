@@ -2,6 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use darling::FromDeriveInput;
 use proc_macro::TokenStream;
+use proc_macro2::Ident;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
@@ -25,14 +26,24 @@ pub fn component(input: TokenStream) -> TokenStream {
     let lower_ident = ident.to_string().to_ascii_lowercase();
     let tag = format!("component-{}", lower_ident);
 
-    let client_insert = if let Some(js_path) = js_path {
+    let (client_insert, client_fn) = if let Some(js_path) = js_path {
         let hydrate_str = format!("hydrate_{lower_ident}");
-        quote! {
-            entity.insert(elementary_rs_lib::js_path::JSPath(#js_path.to_string()));
-            entity.insert(elementary_rs_lib::hydration_fn_name::HydrationFnName(#hydrate_str.to_string()));
-        }
+        let hydrate_ident = Ident::new(&hydrate_str, ident.span());
+        (
+            quote! {
+                entity.insert(elementary_rs_lib::js_path::JSPath(#js_path.to_string()));
+                entity.insert(elementary_rs_lib::hydration_fn_name::HydrationFnName(#hydrate_str.to_string()));
+            },
+            quote! {
+                #[cfg(target_arch = "wasm32")]
+                #[wasm_bindgen::prelude::wasm_bindgen]
+                pub async fn #hydrate_ident(serial_page: wasm_bindgen::JsValue, serial_server_data_map: wasm_bindgen::JsValue) -> Result<(), wasm_bindgen::JsValue> {
+                    #ident::hydrate(serial_page, serial_server_data_map).await
+                }
+            },
+        )
     } else {
-        quote! {}
+        (quote! {}, quote! {})
     };
 
     quote! {
@@ -51,6 +62,8 @@ pub fn component(input: TokenStream) -> TokenStream {
                 entity.id()
             }
         }
+
+        #client_fn
     }
     .into()
 }

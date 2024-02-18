@@ -58,7 +58,10 @@ fn push_node_server_data(into: &mut SerialServerData, node_ref: &NodeRef) {
 }
 
 #[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize, Debug))]
-#[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize, Debug))]
+#[cfg_attr(
+    not(target_arch = "wasm32"),
+    derive(serde::Serialize, serde::Deserialize, Debug)
+)]
 #[derive(Clone)]
 pub struct SerialServerData(pub HashMap<String, HashMap<String, serde_json::Value>>);
 
