@@ -2,7 +2,7 @@ use elementary_rs_lib::node::{Node, NodeRef, View};
 use elementary_rs_macros::{hydrate, view, Component};
 use serde::{Deserialize, Serialize};
 
-#[derive(Component, bevy_ecs::component::Component, Serialize, Deserialize)]
+#[derive(Component, bevy_ecs::component::Component, Copy, Clone, Serialize, Deserialize)]
 pub struct MyH1 {}
 
 // #[async_trait]

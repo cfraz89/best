@@ -18,10 +18,12 @@ impl Page for IndexPage {}
 
 impl View for IndexPage {
     async fn build(&self) -> NodeRef {
+        let x = self.x;
         view!(
             <div>
                 <MyH1>
-                    {self.x * 10}
+                    {x * 10}
+                    {x * 20}
                 </MyH1>
             </div>
         )
