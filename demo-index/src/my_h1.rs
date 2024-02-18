@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use elementary_rs_lib::node::{Node, NodeRef, View};
 use elementary_rs_macros::{hydrate, view, Component};
 use serde::{Deserialize, Serialize};
@@ -7,7 +9,7 @@ pub struct MyH1 {}
 
 // #[async_trait]
 impl View for MyH1 {
-    async fn build(&self) -> NodeRef {
+    async fn build(self: Arc<Self>) -> NodeRef {
         let title = self.my_title().await;
         view! {
             <div>

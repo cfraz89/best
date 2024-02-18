@@ -1,5 +1,12 @@
 use std::{
-    any::Any, collections::HashMap, fmt::Formatter, future::Future, ops::Deref, pin::Pin, sync::Arc,
+    any::Any,
+    collections::HashMap,
+    fmt::Formatter,
+    future::Future,
+    ops::Deref,
+    pin::Pin,
+    rc::Rc,
+    sync::{Arc, Weak},
 };
 
 use crate::{
@@ -72,15 +79,15 @@ pub struct HtmlElement {
 
 // #[async_trait]
 pub trait View {
-    async fn build(&self) -> NodeRef;
+    async fn build(self: Arc<Self>) -> NodeRef;
 }
 
 pub trait DynView {
-    fn build(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>>;
+    fn build(self: Arc<Self>) -> Pin<Box<dyn Future<Output = NodeRef> + Send>>;
 }
 
-impl<T: View<build(): Send>> DynView for T {
-    fn build(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>> {
+impl<T: View<build(): Send> + 'static> DynView for T {
+    fn build(self: Arc<Self>) -> Pin<Box<dyn Future<Output = NodeRef> + Send>> {
         Box::pin(View::build(self))
     }
 }
@@ -127,7 +134,7 @@ pub async fn construct_entity_view(
             .clone();
     }
     if !has_node {
-        let node_ref = view.build().await;
+        let node_ref = view.0.clone().build().await;
         {
             println!("Building view for entity {:?} {:?}", entity, node_ref);
             let mut world = WORLD.write().unwrap();

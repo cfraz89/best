@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use demo_index::IndexPage;
-use elementary_rs_lib::page::Page;
+use elementary_rs_lib::{page::Page, signal::Signal};
 use tower_http::services::ServeDir;
 use wasm_bindgen::prelude::*;
 
@@ -28,7 +28,7 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    let page = IndexPage { x: 20 }
+    let page = IndexPage { x: Signal::new(20) }
         .render()
         .await
         .expect("Render page didnt return!");
