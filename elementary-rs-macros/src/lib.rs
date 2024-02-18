@@ -2,7 +2,7 @@
 #![feature(proc_macro_diagnostic)]
 mod component;
 mod hydrate;
-mod page;
+// mod page;
 mod template_node;
 mod view;
 
@@ -18,10 +18,10 @@ pub fn component(input: TokenStream) -> TokenStream {
     component::component(input)
 }
 
-#[proc_macro_attribute]
-pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
-    page::page(attr, item)
-}
+// #[proc_macro_attribute]
+// pub fn page(attr: TokenStream, item: TokenStream) -> TokenStream {
+//     page::page(attr, item)
+// }
 
 #[proc_macro]
 pub fn view(input: TokenStream) -> TokenStream {

@@ -5,3 +5,6 @@ build-demo-index-wasm:
 
 build-server:
   cargo build
+
+dev:
+  cargo watch -s "just build-all && cargo run"

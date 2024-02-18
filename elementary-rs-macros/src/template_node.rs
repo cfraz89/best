@@ -41,17 +41,17 @@ impl ToTokens for TemplateNode {
                     child_nodes,
                 } => {
                     quote! {
-                        elementary_rs_lib::node::Node::HtmlElement {
+                        elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::HtmlElement {
                             element: elementary_rs_lib::node::HtmlElement {
                                 tag: #tag.to_string(),
                                 attributes: Default::default(),
                             },
                             child_nodes: vec![#(#child_nodes),*]
-                        }
+                        })
                     }
                 }
                 TemplateNode::Text(text) => quote! {
-                    elementary_rs_lib::node::Node::Text(#text.to_string())
+                    elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::Text(#text.to_string()))
                 }
                 .into(),
                 TemplateNode::ComponentElement {
@@ -65,12 +65,12 @@ impl ToTokens for TemplateNode {
                         }
                     });
                     quote! {
-                        elementary_rs_lib::node::Node::Component {
+                        elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::Component {
                             entity: elementary_rs_lib::component::Component::build_entity(#name_ident {
                                         #(#properties),*
                                     }),
                             child_nodes: vec![#(#child_nodes),*]
-                        }
+                        })
                     }
                     .into()
                 }
@@ -80,10 +80,9 @@ impl ToTokens for TemplateNode {
                     //Adding the e to make it a valid identifier
                     let hash = hasher.finish();
                     quote! {
-                        elementary_rs_lib::node::Node::Expression(#hash.to_string(), Box::new({
-                            let _self = self.clone();
+                        elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::Expression(#hash.to_string(), Box::new({
                             move || (#tokens).to_string()
-                    })).into()
+                    })))
                     }
                 }
             })

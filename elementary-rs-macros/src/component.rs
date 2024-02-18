@@ -22,10 +22,15 @@ pub fn component(input: TokenStream) -> TokenStream {
 
     let ident = ast.ident;
 
-    let tag = format!("component-{}", ident.to_string().to_ascii_lowercase());
+    let lower_ident = ident.to_string().to_ascii_lowercase();
+    let tag = format!("component-{}", lower_ident);
 
-    let js_path_insert = if let Some(js_path) = js_path {
-        quote! { entity.insert(elementary_rs_lib::js_path::JSPath(#js_path.to_string())); }
+    let client_insert = if let Some(js_path) = js_path {
+        let hydrate_str = format!("hydrate_{lower_ident}");
+        quote! {
+            entity.insert(elementary_rs_lib::js_path::JSPath(#js_path.to_string()));
+            entity.insert(elementary_rs_lib::hydration_fn_name::HydrationFnName(#hydrate_str.to_string()));
+        }
     } else {
         quote! {}
     };
@@ -41,7 +46,7 @@ pub fn component(input: TokenStream) -> TokenStream {
                   elementary_rs_lib::tag::Tag(#tag.to_string())
                 ));
 
-                #js_path_insert
+                #client_insert
 
                 entity.id()
             }

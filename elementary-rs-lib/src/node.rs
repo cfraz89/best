@@ -1,4 +1,6 @@
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
+use std::{
+    any::Any, collections::HashMap, fmt::Formatter, future::Future, ops::Deref, pin::Pin, sync::Arc,
+};
 
 use crate::{
     selector::Selector,
@@ -6,7 +8,7 @@ use crate::{
     tag::Tag,
     world::WORLD,
 };
-use bevy_ecs::entity::Entity;
+use bevy_ecs::{component::Component, entity::Entity};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use web_sys::{window, Comment, TreeWalker};
@@ -15,20 +17,54 @@ use web_sys::{window, Comment, TreeWalker};
 /// Ashamedly had to reference leptos here
 const SHOW_COMMENT: u32 = 0x80;
 
-#[derive(bevy_ecs::component::Component)]
 pub enum Node {
     Text(String),
     HtmlElement {
         element: HtmlElement,
-        child_nodes: Vec<Node>,
+        child_nodes: Vec<NodeRef>,
     },
     Component {
         entity: Entity,
-        child_nodes: Vec<Node>,
+        child_nodes: Vec<NodeRef>,
     },
     Expression(String, Box<dyn Fn() -> String + Send + Sync>),
 }
 
+impl std::fmt::Debug for Node {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Node::Text(s) => write!(f, "Text({s})"),
+            Node::HtmlElement {
+                element,
+                child_nodes,
+            } => write!(f, "HtmlElement({:?}, {:?})", element, child_nodes),
+            Node::Component {
+                entity,
+                child_nodes,
+            } => write!(f, "Component({:?}, {:?})", entity, child_nodes),
+            Node::Expression(e, _expr) => write!(f, "Expression({e})"),
+        }
+    }
+}
+
+#[derive(Component, Clone, Debug)]
+pub struct NodeRef(Arc<Node>);
+
+impl From<Node> for NodeRef {
+    fn from(node: Node) -> NodeRef {
+        NodeRef(Arc::new(node))
+    }
+}
+
+impl Deref for NodeRef {
+    type Target = Arc<Node>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug)]
 pub struct HtmlElement {
     pub tag: String,
     pub attributes: HashMap<String, String>,
@@ -36,15 +72,15 @@ pub struct HtmlElement {
 
 // #[async_trait]
 pub trait View {
-    async fn build(&self) -> Node;
+    async fn build(&self) -> NodeRef;
 }
 
 pub trait DynView {
-    fn build(&self) -> Pin<Box<dyn Future<Output = Node> + Send + '_>>;
+    fn build(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>>;
 }
 
 impl<T: View<build(): Send>> DynView for T {
-    fn build(&self) -> Pin<Box<dyn Future<Output = Node> + Send + '_>> {
+    fn build(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>> {
         Box::pin(View::build(self))
     }
 }
@@ -58,29 +94,47 @@ impl<T: View<build(): Send> + Sync + Send + 'static> From<T> for AnyView {
     }
 }
 
+impl Deref for AnyView {
+    type Target = Arc<dyn DynView + Sync + Send>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// Construct the view and put it into the ecs
 pub async fn construct_entity_view(
     entity: &Entity,
     serial_server_data: Option<SerialServerData>,
 ) -> Result<(), JsValue> {
-    let mut world = WORLD.write().unwrap();
-    let mut entity_ref = world.entity_mut(*entity);
-    let selector = entity_ref
-        .get::<Selector>()
-        .expect("Entity needs a selector");
-    if entity_ref.get::<ServerData>().is_none() {
-        if let Some(server_data) = serial_server_data.as_ref().and_then(|s| s.get(selector)) {
-            entity_ref.insert(server_data);
+    let has_node: bool;
+    let view: AnyView;
+    {
+        let mut world = WORLD.write().unwrap();
+        let mut entity_ref = world.entity_mut(*entity);
+        let selector = entity_ref
+            .get::<Selector>()
+            .expect("Entity needs a selector");
+        if entity_ref.get::<ServerData>().is_none() {
+            if let Some(server_data) = serial_server_data.as_ref().and_then(|s| s.get(selector)) {
+                entity_ref.insert(server_data);
+            }
         }
-    }
-    let node = entity_ref.get::<Node>();
-    if node.is_none() {
-        let view = entity_ref
+        has_node = entity_ref.contains::<NodeRef>();
+        view = entity_ref
             .get::<AnyView>()
-            .expect("Entity should have a view");
-        let node = view.0.build().await;
-        construct_entity_view_with_node(entity, &node, serial_server_data).await?;
-        entity_ref.insert(node);
+            .expect("Entity should have a view")
+            .clone();
+    }
+    if !has_node {
+        let node_ref = view.build().await;
+        {
+            println!("Building view for entity {:?} {:?}", entity, node_ref);
+            let mut world = WORLD.write().unwrap();
+            let mut entity_ref = world.entity_mut(*entity);
+            entity_ref.insert(node_ref.clone());
+        }
+        construct_entity_view_with_node(entity, node_ref.into(), serial_server_data).await?;
     }
     Ok(())
 }
@@ -88,16 +142,23 @@ pub async fn construct_entity_view(
 #[async_recursion::async_recursion]
 async fn construct_entity_view_with_node(
     entity: &Entity,
-    node: &Node,
+    node_ref: NodeRef,
     serial_server_data: Option<SerialServerData>,
 ) -> Result<(), JsValue> {
-    match node {
+    match node_ref.as_ref() {
         Node::Component {
             entity,
             child_nodes,
         } => {
-            for child in child_nodes.iter() {
-                construct_entity_view_with_node(entity, child, serial_server_data.clone()).await?;
+            //Construct view for the entity, if necessary (it may have been constructed in a previous visit)
+            construct_entity_view(entity, serial_server_data.clone()).await?;
+            for child in child_nodes.into_iter() {
+                construct_entity_view_with_node(
+                    &entity,
+                    child.to_owned(),
+                    serial_server_data.clone(),
+                )
+                .await?;
             }
             Ok(())
         }
@@ -105,37 +166,45 @@ async fn construct_entity_view_with_node(
             element: _,
             child_nodes,
         } => {
-            for child in child_nodes.iter() {
-                construct_entity_view_with_node(entity, child, serial_server_data.clone()).await?;
+            for child in child_nodes.into_iter() {
+                construct_entity_view_with_node(
+                    &entity,
+                    child.to_owned(),
+                    serial_server_data.clone(),
+                )
+                .await?;
             }
             Ok(())
         }
+        #[cfg(target_arch = "wasm32")]
         Node::Expression(id, expr) => {
             let document = window()
                 .expect("No window")
                 .document()
                 .expect("no document");
             web_sys::console::log_1(&format!("Binding expression {:?}", id).into());
-            let world = WORLD.read().unwrap();
-            let entity_ref = world.entity(*entity);
-            let selector = entity_ref
-                .get::<Selector>()
-                .expect("Entity needs a selector");
-            let host_component = &document
-                .query_selector(&selector.to_string())?
-                .expect("id should exist");
-            drop(world);
+            let host_component: web_sys::Element;
+            {
+                let world = WORLD.read().unwrap();
+                let entity_ref = world.entity(*entity);
+                let selector = entity_ref
+                    .get::<Selector>()
+                    .expect("Entity needs a selector");
+                host_component = document
+                    .query_selector(&selector.to_string())?
+                    .expect("id should exist");
+            }
             // We walk the host component to query its child nodes
             let comments_walker =
-                document.create_tree_walker_with_what_to_show(host_component, SHOW_COMMENT)?;
-            replace_expression_comments(&comments_walker, id, expr)?;
+                document.create_tree_walker_with_what_to_show(&host_component, SHOW_COMMENT)?;
+            replace_expression_comments(&comments_walker, &id, &expr)?;
             // And again for its shadow root template
             if let Some(shadow_root) = host_component.shadow_root() {
                 let comments_walker = document.create_tree_walker_with_what_to_show(
                     &shadow_root.get_root_node(),
                     SHOW_COMMENT,
                 )?;
-                replace_expression_comments(&comments_walker, id, expr)?;
+                replace_expression_comments(&comments_walker, &id, &expr)?;
             }
             Ok(())
         }
@@ -238,7 +307,7 @@ if #[cfg(not(target_arch = "wasm32"))] {
                     } else {
                         write!(output, " >")?;
                         for child in child_nodes.iter() {
-                            output.write_str(child.render()?.as_str())?;
+                            output.write_str(child.0.render()?.as_str())?;
                         }
                         write!(output, "</{}>", tag)?;
                     }
@@ -252,8 +321,9 @@ if #[cfg(not(target_arch = "wasm32"))] {
                     let world = WORLD.read().unwrap();
                     let entity_ref = world.entity(*entity);
                     let tag = entity_ref.get::<Tag>().expect("No tag on entity");
-                    let selector = entity_ref.get::<Selector>().expect("No selector on entity");
-                    let node = entity_ref.get::<Node>().expect("No node on enttiy");
+                    let selector = entity_ref.get::<Selector>().expect(format!("No selector on entity {:?}", entity).as_str());
+                    let node_ref = entity_ref.get::<NodeRef>().expect(format!("No node on entity {:?}", entity).as_str());
+                    println!("Rendering component {:?} {:?} {:?}", entity, tag, node_ref);
                     let selector_attr = match selector {
                             Selector::Id(id) => format!("id=\"_{id}\""),
                             Selector::Class(class) => format!("class=\"_{class}\""),
@@ -263,10 +333,10 @@ if #[cfg(not(target_arch = "wasm32"))] {
                         "<{} {}><template shadowrootmode=\"open\">{}</template>",
                         tag.0,
                         selector_attr,
-                        node.render()?
+                        node_ref.render()?
                     )?;
                     for child in child_nodes.iter() {
-                        output.write_str(child.render()?.as_str())?;
+                        output.write_str(child.0.render()?.as_str())?;
                     }
                     write!(output, "</{}>", tag.0)?;
                     Ok(output)

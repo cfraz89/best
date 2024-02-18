@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use bevy_ecs::entity::Entity;
 
-use crate::{node::Node, selector::Selector, world::WORLD};
+use crate::{
+    node::{Node, NodeRef},
+    selector::Selector,
+    world::WORLD,
+};
 
 #[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize, Debug))]
 #[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize, Debug))]
@@ -13,24 +17,24 @@ impl ServerData {
     pub fn get_serial_server_data(entity: &Entity) -> SerialServerData {
         let world = WORLD.read().unwrap();
         let entity_ref = world.entity(*entity);
-        let node = entity_ref.get::<Node>().expect("Entity needs a node");
+        let node_ref = entity_ref.get::<NodeRef>().expect("Entity needs a node");
         let selector = entity_ref
             .get::<Selector>()
             .expect("need selector on entity");
-        let server_data = entity_ref
-            .get::<ServerData>()
-            .expect("Need server data on entity");
+        let server_data = entity_ref.get::<ServerData>();
         let mut server_data_map = HashMap::new();
-        server_data_map.insert(selector.to_string(), server_data.0.clone());
+        if let Some(server_data) = server_data {
+            server_data_map.insert(selector.to_string(), server_data.0.clone());
+        }
         let mut serial_map = SerialServerData(server_data_map);
-        push_node_server_data(&mut serial_map, node);
+        push_node_server_data(&mut serial_map, node_ref);
         serial_map
     }
 }
 
 /// Walk the tree and push server data
-fn push_node_server_data(into: &mut SerialServerData, node: &Node) {
-    match node {
+fn push_node_server_data(into: &mut SerialServerData, node_ref: &NodeRef) {
+    match node_ref.as_ref() {
         Node::Component {
             entity,
             child_nodes,

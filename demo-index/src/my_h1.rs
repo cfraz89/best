@@ -1,4 +1,4 @@
-use elementary_rs_lib::node::{Node, View};
+use elementary_rs_lib::node::{Node, NodeRef, View};
 use elementary_rs_macros::{hydrate, view, Component};
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ pub struct MyH1 {}
 
 // #[async_trait]
 impl View for MyH1 {
-    async fn build(&self) -> Node {
+    async fn build(&self) -> NodeRef {
         let title = self.my_title().await;
         view! {
             <div>

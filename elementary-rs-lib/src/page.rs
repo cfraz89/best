@@ -4,7 +4,7 @@ use crate::{
     component::Component,
     hydration_fn_name::{self, HydrationFnName},
     js_path::{self, JSPath},
-    node::{construct_entity_view, AnyView, Node, View},
+    node::{construct_entity_view, AnyView, Node, NodeRef, View},
     server_data::{SerialServerData, ServerData},
     world::WORLD,
 };
@@ -18,30 +18,35 @@ cfg_if::cfg_if! {
                 let serial_page = serde_json::to_string(&self)?;
                 //written out by macro
                 let entity = self.build_entity();
-                let outer_hydration_fn_name: String;
-                let outer_js_path: String;
+                let hydration_fn_name: Option<HydrationFnName>;
+                let js_path: Option<JSPath>;
                 {
                     let world = WORLD.read().unwrap();
                     let entity_ref = world.entity(entity);
-                    let JSPath(js_path) = entity_ref.get().expect("Entity needs a js path");
-                    outer_js_path = js_path.clone();
-                    let HydrationFnName(hydration_fn_name) = entity_ref.get().expect("Entity needs a js path");
-                    outer_hydration_fn_name = hydration_fn_name.clone();
+                    js_path = entity_ref.get::<JSPath>().cloned();
+                    hydration_fn_name = entity_ref.get::<HydrationFnName>().cloned();
                 }
                 construct_entity_view(&entity, None).await.expect("failed constructing view");
                 {
                     let world = WORLD.read().unwrap();
                     let entity_ref = world.entity(entity);
-                    let rendered_node = entity_ref.get::<Node>().expect("page has no node").render().expect("Render didnt give any output!");
-                    let SerialServerData(server_data) = ServerData::get_serial_server_data(&entity);
-                    let server_data = serde_json::to_string(&server_data)?;
+
+                    let rendered_node = entity_ref.get::<NodeRef>().expect("page has no node").render().expect("Render didnt give any output!");
                     let selector = entity_ref.get::<Selector>().to_owned().expect("Entity needs a selector");
                     let selector_attr = match selector {
                                             Selector::Id(id) => format!("id=\"_{id}\""),
                                             Selector::Class(class) => format!("class=\"_{class}\""),
                                         };
+                    let script = match (js_path, hydration_fn_name) {
+                        (Some(JSPath(js_path)), Some(HydrationFnName(hydration_fn_name))) => {
+                            let serial_server_data = ServerData::get_serial_server_data(&entity);
+                            let server_data_string = serde_json::to_string(&serial_server_data)?;
+                            Ok(format!("<script type=\"module\">import start, {{ {hydration_fn_name} }} from \"{js_path}\"; await start(); await {hydration_fn_name}({serial_page}, {server_data_string});</script>"))
+                        }
+                        _ => Ok("".to_string())
+                    }?;
                     Ok(format!(
-                        "<!doctype html><html><head></head><body {selector_attr}>{rendered_node}<script type=\"module\">import start, {{ {outer_hydration_fn_name} }} from \"{outer_js_path}\"; await start(); await {outer_hydration_fn_name}({serial_page}, {server_data});</script></body></html>",
+                        "<!doctype html><html><head></head><body {selector_attr}>{rendered_node}{script}</body></html>",
 
                     ))
                 }
@@ -49,26 +54,26 @@ cfg_if::cfg_if! {
         }
 
     } else {
-    pub trait Page: Component + serde::de::DeserializeOwned {}
+        pub trait Page: Component {
 
-        use crate::node::{ServerDataMap};
-        use gloo_utils::format::JsValueSerdeExt;
-        use serde::Deserialize;
-        use wasm_bindgen::JsValue;
+            // use gloo_utils::format::JsValueSerdeExt;
+            // use serde::Deserialize;
+            // use wasm_bindgen::JsValue;
 
-        pub async fn hydrate<T: Component + for<'a> Deserialize<'a>>(
-            serial_page: JsValue,
-            serial_server_data_map: JsValue,
-        ) -> Result<(), JsValue> {
-            let page: T = serial_page
-                .into_serde()
-                .expect("Could not deserialize initial value!");
-            let server_data_map: ServerDataMap = serial_server_data_map
-                .into_serde()
-                .expect("Could not deserialize initial value!");
-            page.reified_view(Some(&server_data_map)).await?;
-            page.bind()?;
-            Ok(())
+            // pub async fn hydrate<T: Component + for<'a> Deserialize<'a>>(
+            //     serial_page: JsValue,
+            //     serial_server_data: JsValue,
+            // ) -> Result<(), JsValue> {
+                // let page: T = serial_page
+                //     .into_serde()
+                //     .expect("Could not deserialize initial value!");
+                // let serial_server_data: SerialServerData = serial_server_data
+                //     .into_serde()
+                //     .expect("Could not deserialize server data!");
+                // construct_entity_view(entity, serial_server_data).await?;
+                // page.bind()?;
+                // Ok(())
+            // }
         }
     }
 }
