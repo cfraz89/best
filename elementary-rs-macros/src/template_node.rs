@@ -22,13 +22,13 @@ pub enum TemplateNode {
 #[derive(Debug)]
 pub struct ComponentElement {
     pub name: String,
-    pub properties: HashMap<Ident, TokenStream>,
+    pub properties: Vec<(Ident, TokenStream)>,
 }
 
 #[derive(Debug)]
 pub struct HtmlElement {
     pub tag: String,
-    pub attributes: HashMap<String, String>,
+    pub attributes: Vec<(String, String)>,
 }
 
 /// Macrotic writing out TemplateNode -> Node
@@ -37,14 +37,19 @@ impl ToTokens for TemplateNode {
         {
             tokens.extend(match self {
                 TemplateNode::HtmlElement {
-                    element: HtmlElement { tag, attributes: _ },
+                    element: HtmlElement { tag, attributes },
                     child_nodes,
                 } => {
+                    let attributes = attributes.iter().map(|(k, v)| {
+                        quote! {
+                        (#k.to_string(), #v.to_string())
+                        }
+                    });
                     quote! {
                         elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::HtmlElement {
                             element: elementary_rs_lib::node::HtmlElement {
                                 tag: #tag.to_string(),
-                                attributes: Default::default(),
+                                attributes: vec![#(#attributes),*]
                             },
                             child_nodes: vec![#(#child_nodes),*]
                         })
@@ -61,7 +66,7 @@ impl ToTokens for TemplateNode {
                     let name_ident = format_ident!("{}", name);
                     let properties = properties.iter().map(|(k, v)| {
                         quote! {
-                        #k: #v
+                        #k: #v.into()
                         }
                     });
                     quote! {

@@ -1,20 +1,25 @@
 use std::sync::Arc;
 
-use elementary_rs_lib::node::{Node, NodeRef, View};
+use elementary_rs_lib::{
+    node::{Node, NodeRef, View},
+    signal::Signal,
+};
 use elementary_rs_macros::{hydrate, view, Component};
 use serde::{Deserialize, Serialize};
 
-#[derive(Component, bevy_ecs::component::Component, Copy, Clone, Serialize, Deserialize)]
-pub struct MyH1 {}
+#[derive(Component, bevy_ecs::component::Component, Clone, Serialize, Deserialize)]
+pub struct MyH1 {
+    pub name: String,
+}
 
 // #[async_trait]
 impl View for MyH1 {
-    async fn build(self: Arc<Self>) -> NodeRef {
+    async fn build(self) -> NodeRef {
         let title = self.my_title().await;
         view! {
             <div>
-                <h1>{title}</h1>
-                <div>Hi</div>
+                <h1 style="color: red;">{title}</h1>
+                <div>Hi {self.name}</div>
                 <slot />
             </div>
         }

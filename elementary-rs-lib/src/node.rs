@@ -74,28 +74,28 @@ impl Deref for NodeRef {
 #[derive(Debug)]
 pub struct HtmlElement {
     pub tag: String,
-    pub attributes: HashMap<String, String>,
+    pub attributes: Vec<(String, String)>,
 }
 
 // #[async_trait]
 pub trait View {
-    async fn build(self: Arc<Self>) -> NodeRef;
+    async fn build(self) -> NodeRef;
 }
 
 pub trait DynView {
-    fn build(self: Arc<Self>) -> Pin<Box<dyn Future<Output = NodeRef> + Send>>;
+    fn build(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send>>;
 }
 
-impl<T: View<build(): Send> + 'static> DynView for T {
-    fn build(self: Arc<Self>) -> Pin<Box<dyn Future<Output = NodeRef> + Send>> {
-        Box::pin(View::build(self))
+impl<T: View<build(): Send> + 'static + Clone> DynView for T {
+    fn build(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send>> {
+        Box::pin(View::build(self.clone()))
     }
 }
 
 #[derive(bevy_ecs::component::Component, Clone)]
 pub struct AnyView(pub Arc<dyn DynView + Sync + Send>);
 
-impl<T: View<build(): Send> + Sync + Send + 'static> From<T> for AnyView {
+impl<T: View<build(): Send> + Sync + Send + Clone + 'static> From<T> for AnyView {
     fn from(component: T) -> Self {
         AnyView(Arc::new(component))
     }
@@ -134,7 +134,7 @@ pub async fn construct_entity_view(
             .clone();
     }
     if !has_node {
-        let node_ref = view.0.clone().build().await;
+        let node_ref = view.build().await;
         {
             println!("Building view for entity {:?} {:?}", entity, node_ref);
             let mut world = WORLD.write().unwrap();

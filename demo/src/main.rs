@@ -28,7 +28,7 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    let page = IndexPage { x: Signal::new(20) }
+    let page = IndexPage { x: 20 }
         .render()
         .await
         .expect("Render page didnt return!");

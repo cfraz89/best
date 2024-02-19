@@ -11,7 +11,7 @@ use bevy_ecs::{component::Component, entity::Entity};
 
 use crate::world::WORLD;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Signal<T> {
     entity: Entity,
     data: PhantomData<T>, // val: Arc<Mutex<T>>,

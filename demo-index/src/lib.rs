@@ -14,20 +14,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Component, bevy_ecs::component::Component, Serialize, Deserialize, Clone)]
 #[page(js_path = "./wasm/demo_index.js")]
 pub struct IndexPage {
-    #[serde(skip)]
-    pub x: Signal<i32>,
+    pub x: i32,
 }
 
 impl Page for IndexPage {}
 
 impl View for IndexPage {
-    async fn build(self: Arc<Self>) -> NodeRef {
-        let s = self.as_ref().clone();
+    async fn build(self) -> NodeRef {
         view!(
             <div>
-                <MyH1>
-                    {s.x.get() * 10}
-                    {s.x.get() * 20}
+                <MyH1 name="Fred">
+                    {self.x * 20}
                 </MyH1>
             </div>
         )

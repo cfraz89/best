@@ -1,5 +1,5 @@
 use crate::template_node::{self, TemplateNode};
-use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{token_stream::IntoIter, Literal, Spacing, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use std::{collections::HashMap, iter::Peekable, sync::Arc};
 
@@ -158,6 +158,67 @@ fn parse_tag_name(iter: &mut Peekable<IntoIter>) -> Result<String, ParseError> {
     }
 }
 
+/// Parse an attribute
+fn parse_attribute(
+    iter: &mut Peekable<IntoIter>,
+) -> Result<(String, Span, TokenStream), ParseError> {
+    let mut attribute_name: Option<String> = None;
+    let mut span: Option<Span> = None;
+    loop {
+        let input = peek_token(iter, "attribute name".to_string())?;
+        match (input, &mut attribute_name) {
+            (TokenTree::Ident(i), None) => {
+                attribute_name = Some(i.to_string());
+                span = Some(i.span());
+                take_token(iter, "attribute name".to_string())?;
+                Ok(())
+            }
+            (TokenTree::Ident(i), Some(t)) => {
+                t.push_str(&i.to_string());
+                span = Some(i.span());
+                Ok(())
+            }
+            (TokenTree::Punct(p), Some(t))
+                if p.as_char() == '-' && p.spacing() == Spacing::Joint =>
+            {
+                span = Some(p.span());
+                t.push_str("-");
+                Ok(())
+            }
+            (TokenTree::Punct(p), Some(_t)) if p.as_char() == '=' => {
+                take_token(iter, "attribute asignment (=)".to_string())?;
+                break;
+            }
+            (TokenTree::Punct(p), None) => Err(ParseError::UnexpectedToken {
+                expected: "identifier".to_string(),
+                found: p.to_string(),
+                at: p.span(),
+            }),
+            (t, _) => Err(ParseError::UnexpectedToken {
+                expected: "identifier".to_string(),
+                found: t.to_string(),
+                at: t.span(),
+            }),
+        }?;
+    }
+    match (attribute_name, span) {
+        (Some(t), Some(span)) => {
+            let value = take_token(iter, "attribute value".to_string())?;
+            match value.clone() {
+                TokenTree::Literal(_) => Ok((t, span, value.into())),
+                v => Err(ParseError::UnexpectedToken {
+                    expected: "attribute value literal".to_string(),
+                    found: v.to_string(),
+                    at: v.span(),
+                }),
+            }
+        }
+        (_, _) => Err(ParseError::EndOfInput {
+            expected: "tag name".to_string(),
+        }),
+    }
+}
+
 /// Parse a html-like macro template into a TemplateNode
 fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError> {
     let mut text = Option::<String>::None;
@@ -223,9 +284,23 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     //Parse tag name
     let tag = parse_tag_name(iter)?;
 
+    //Pare attributes
+    let mut attributes = Vec::<(String, Span, TokenStream)>::new();
+    loop {
+        //If we have an identifier coming up, try to treat it as an attribute
+        let ident = peek_token(iter, "attribute".to_string())?;
+        match ident {
+            TokenTree::Ident(_) => {
+                let attr = parse_attribute(iter)?;
+                attributes.push(attr);
+            }
+            _ => break,
+        }
+    }
+
     if peek_self_close_tag(iter).is_ok() {
         parse_self_close_tag(iter)?;
-        return get_element(tag, Arc::new(Vec::new()));
+        return get_element(tag, attributes, Arc::new(Vec::new()));
     }
 
     //Parse opening tag closing bracket
@@ -254,26 +329,46 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     //Parse closing tag closing bracket
     parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
 
-    get_element(tag, Arc::new(child_nodes))
+    get_element(tag, attributes, Arc::new(child_nodes))
 }
 
-fn get_element(tag: String, child_nodes: Arc<Vec<TemplateNode>>) -> Result<Element, ParseError> {
+/// Return our TemplateNode element given tag, attributes and child nodes
+fn get_element(
+    tag: String,
+    attributes: Vec<(String, Span, TokenStream)>,
+    child_nodes: Arc<Vec<TemplateNode>>,
+) -> Result<Element, ParseError> {
     //If its an uppercase tag, its a custom element
     if tag.chars().next().unwrap().is_uppercase() {
+        let properties: Vec<(proc_macro2::Ident, proc_macro2::TokenStream)> = attributes
+            .into_iter()
+            .map(|(name, span, v)| (proc_macro2::Ident::new(&name, span.into()), v.into()))
+            .collect();
         Ok(Element::Component {
             element: template_node::ComponentElement {
                 name: tag,
                 //TODO convert the token stream into the hashmap
-                properties: HashMap::new(),
+                properties,
             },
             child_nodes,
         })
     } else {
+        //Parse all the strings in our attribute tokenstreams
+        let attributes = attributes
+            .into_iter()
+            .map(
+                |(name, span, v)| match syn::parse::<syn::LitStr>(v.clone()) {
+                    Ok(s) => Ok((name, s.value())),
+                    Err(e) => Err(ParseError::UnexpectedToken {
+                        expected: "string literal".to_string(),
+                        found: v.to_string(),
+                        at: span,
+                    }),
+                },
+            )
+            .collect::<Result<Vec<(String, String)>, ParseError>>()?;
         Ok(Element::Html {
-            element: template_node::HtmlElement {
-                tag,
-                attributes: HashMap::new(),
-            },
+            element: template_node::HtmlElement { tag, attributes },
             child_nodes,
         })
     }
