@@ -2,12 +2,14 @@ use crate::template_node::{self, TemplateNode};
 use proc_macro::{token_stream::IntoIter, Literal, Spacing, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use std::{collections::HashMap, iter::Peekable, sync::Arc};
+use tap::Tap;
 
 /// Parse a html-like template into a TemplateNode. Then emit its token stream, which will generate a Node
 pub fn view(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
     match parse_node(iter) {
-        Ok(node) => node.to_token_stream().into(),
+        Ok(Some(node)) => node.tap(|n| println!("{:?}", n)).to_token_stream().into(),
+        Ok(None) => panic!("Didn't read any nodes"),
         Err(ParseError::EndOfInput { expected }) => {
             panic!("Unexpected end of input, expected {}", expected)
         }
@@ -234,10 +236,20 @@ fn parse_attribute(
 }
 
 /// Parse a html-like macro template into a TemplateNode
-fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError> {
+fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<Option<TemplateNode>, ParseError> {
+    let mut token: TokenTree;
+    //Decide wether we're parsing this node as text or an expression first
+    token = peek_token(iter, "text".to_string())?;
+    match &token {
+        TokenTree::Group(g) if g.delimiter() == proc_macro::Delimiter::Brace => {
+            take_token(iter, "group".to_string())?;
+            return Ok(Some(TemplateNode::Expression(g.stream().into())));
+        }
+        _ => {}
+    };
+    //Not a group/expression, so read text as long as we can
     let mut text = Option::<String>::None;
     //Treat it as a text node until we hit a '<' or '{'
-    let mut token: TokenTree;
     loop {
         token = peek_token(iter, "text".to_string())?;
         match &token {
@@ -245,8 +257,7 @@ fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError>
                 break;
             }
             TokenTree::Group(g) if g.delimiter() == proc_macro::Delimiter::Brace => {
-                take_token(iter, "group".to_string())?;
-                return Ok(TemplateNode::Expression(g.stream().into()));
+                break;
             }
             _ => {}
         }
@@ -254,13 +265,16 @@ fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError>
         if let Some(ref mut t) = text {
             t.push_str(&token.to_string());
         } else {
+            println!("Set text: {:?}", token);
             text = Some(token.to_string());
         }
     }
+    println!("Text: {:?}", text);
     if let Some(t) = text {
-        Ok(TemplateNode::Text(t))
+        println!("Got text: {t}");
+        Ok(Some(TemplateNode::Text(t)))
     } else {
-        Ok(match parse_element(iter)? {
+        Ok(Some(match parse_element(iter)? {
             Element::Html {
                 element,
                 child_nodes,
@@ -275,7 +289,7 @@ fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<TemplateNode, ParseError>
                 element,
                 child_nodes,
             },
-        })
+        }))
     }
 }
 
@@ -315,8 +329,9 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     let mut child_nodes = Vec::<TemplateNode>::new();
 
     while peek_end_tag(iter).is_err() {
-        let node = parse_node(iter)?;
-        child_nodes.push(node);
+        if let Some(node) = parse_node(iter)? {
+            child_nodes.push(node);
+        }
     }
     //Parse closing tag opening bracket
     parse_punct(&take_token(iter, '<'.to_string())?, '<')?;
@@ -335,7 +350,11 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     //Parse closing tag closing bracket
     parse_punct(&take_token(iter, '>'.to_string())?, '>')?;
 
-    get_element(tag, attributes, Arc::new(child_nodes))
+    get_element(
+        tag,
+        attributes,
+        Arc::new(child_nodes).tap(|n| println!("child nodes{:?}", n)),
+    )
 }
 
 /// Return our TemplateNode element given tag, attributes and child nodes
