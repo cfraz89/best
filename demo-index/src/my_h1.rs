@@ -12,7 +12,6 @@ pub struct MyH1 {
     pub name: String,
 }
 
-// #[async_trait]
 impl View for MyH1 {
     async fn build(self) -> NodeRef {
         let title = self.my_title().await;

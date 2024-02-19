@@ -81,6 +81,20 @@ fn parse_punct(input: &TokenTree, punct: char) -> Result<(), ParseError> {
     }
 }
 
+/// Peek at upcoming tokens, return success if its an identifier
+fn peek_ident(iter: &mut Peekable<IntoIter>) -> Result<(), ParseError> {
+    let cloned_iter = &mut iter.clone();
+    let token = take_token(cloned_iter, "identifier".to_string())?;
+    match token {
+        TokenTree::Ident(_) => Ok(()),
+        t => Err(ParseError::UnexpectedToken {
+            expected: "identifier".to_string(),
+            found: t.to_string(),
+            at: t.span(),
+        }),
+    }
+}
+
 /// Peek at upcoming tokens, return success if its beginning of end tag '</'
 fn peek_end_tag(iter: &mut Peekable<IntoIter>) -> Result<(), ParseError> {
     let cloned_iter = &mut iter.clone();
@@ -286,16 +300,8 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
 
     //Pare attributes
     let mut attributes = Vec::<(String, Span, TokenStream)>::new();
-    loop {
-        //If we have an identifier coming up, try to treat it as an attribute
-        let ident = peek_token(iter, "attribute".to_string())?;
-        match ident {
-            TokenTree::Ident(_) => {
-                let attr = parse_attribute(iter)?;
-                attributes.push(attr);
-            }
-            _ => break,
-        }
+    while peek_ident(iter).is_ok() {
+        attributes.push(parse_attribute(iter)?);
     }
 
     if peek_self_close_tag(iter).is_ok() {
