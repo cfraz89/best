@@ -24,7 +24,7 @@ cfg_if::cfg_if! {
                     js_path = entity_ref.get::<JSPath>().cloned();
                     hydration_fn_name = entity_ref.get::<HydrationFnName>().cloned();
                 }
-                construct_entity_view(&entity, None).await.expect("failed constructing view");
+                construct_entity_view(entity, None).await.expect("failed constructing view");
                 let res: String;
                 {
                     let world = WORLD.read().unwrap();
@@ -72,7 +72,7 @@ cfg_if::cfg_if! {
                     let serial_server_data: SerialServerData = serial_server_data
                         .into_serde()
                         .expect("Could not deserialize server data!");
-                    construct_entity_view(&page.build_entity(), Some(serial_server_data)).await?;
+                    construct_entity_view(page.build_entity(), Some(serial_server_data)).await?;
                     Ok(())
                 }
             }

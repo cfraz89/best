@@ -26,11 +26,12 @@ pub fn hydrate(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[cfg(not(target_arch = "wasm32"))]
         #sig {
+            use bevy_ecs::prelude::*;
             let data = self.#hidden_ident(#hidden_args)#await_tokens;
             let mut world = elementary_rs_lib::world::WORLD.write().unwrap();
             //Self is a elementary component and bevy component
                     println!("Self: {:?}", self);
-            for (page, entity, mut server_data) in world.query::<(&Self, bevy_ecs::entity::Entity, Option<&mut elementary_rs_lib::server_data::ServerData>)>().iter_mut(&mut world) {
+            for (page, entity, mut server_data) in world.query::<(&Self, Entity, Option<&mut elementary_rs_lib::server_data::ServerData>)>().iter_mut(&mut world) {
                     println!("Page: {:?}, Entity: {:?}, Self: {:?}", page, entity, self);
                 if std::ptr::eq(page, self) {
                     println!("Found server data");

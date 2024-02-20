@@ -1,12 +1,9 @@
 use std::{
-    any::Any,
-    collections::HashMap,
     fmt::Formatter,
     future::Future,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     pin::Pin,
-    rc::Rc,
-    sync::{Arc, Weak},
+    sync::Arc,
 };
 
 use crate::{
@@ -15,10 +12,9 @@ use crate::{
     tag::Tag,
     world::WORLD,
 };
-use bevy_ecs::{component::Component, entity::Entity, world::World};
-use serde::Serialize;
+use bevy_ecs::{component::Component, entity::Entity, query::Has, world::World};
 use wasm_bindgen::prelude::*;
-use web_sys::{window, Comment, TreeWalker};
+use web_sys::{Comment, TreeWalker};
 
 /// https://developer.mozilla.org/en-US/docs/Web/API/Document/createTreeWalker
 /// Ashamedly had to reference leptos here
@@ -109,36 +105,43 @@ impl Deref for AnyView {
     }
 }
 
+impl DerefMut for AnyView {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Construct the view and put it into the ecs
 pub async fn construct_entity_view(
-    entity: &Entity,
+    entity: Entity,
     serial_server_data: Option<SerialServerData>,
 ) -> Result<(), JsValue> {
     let has_node: bool;
     let view: AnyView;
     {
         let mut world = WORLD.write().unwrap();
-        let mut entity_ref = world.entity_mut(*entity);
-        let selector = entity_ref
-            .get::<Selector>()
-            .expect("Entity needs a selector");
-        if entity_ref.get::<ServerData>().is_none() {
-            if let Some(server_data) = serial_server_data.as_ref().and_then(|s| s.get(selector)) {
-                entity_ref.insert(server_data);
+        {
+            let (selector, has_server_data, i_has_node, i_view) = world
+                .query::<(&Selector, Has<ServerData>, Has<NodeRef>, &AnyView)>()
+                .get(&world, entity)
+                .unwrap();
+            has_node = i_has_node;
+            view = i_view.clone();
+            if !has_server_data {
+                if let Some(server_data) = serial_server_data.as_ref().and_then(|s| s.get(selector))
+                {
+                    let mut entity_ref = world.entity_mut(entity);
+                    entity_ref.insert(server_data);
+                }
             }
         }
-        has_node = entity_ref.contains::<NodeRef>();
-        view = entity_ref
-            .get::<AnyView>()
-            .expect("Entity should have a view")
-            .clone();
     }
     if !has_node {
         let node_ref = view.build().await;
         {
             println!("Building view for entity {:?} {:?}", entity, node_ref);
             let mut world = WORLD.write().unwrap();
-            let mut entity_ref = world.entity_mut(*entity);
+            let mut entity_ref = world.entity_mut(entity);
             entity_ref.insert(node_ref.clone());
         }
         construct_entity_view_with_node(entity, node_ref.into(), serial_server_data).await?;
@@ -148,7 +151,7 @@ pub async fn construct_entity_view(
 
 #[async_recursion::async_recursion]
 async fn construct_entity_view_with_node(
-    entity: &Entity,
+    entity: Entity,
     node_ref: NodeRef,
     serial_server_data: Option<SerialServerData>,
 ) -> Result<(), JsValue> {
@@ -158,10 +161,10 @@ async fn construct_entity_view_with_node(
             child_nodes,
         } => {
             //Construct view for the entity, if necessary (it may have been constructed in a previous visit)
-            construct_entity_view(entity, serial_server_data.clone()).await?;
+            construct_entity_view(*entity, serial_server_data.clone()).await?;
             for child in child_nodes.into_iter() {
                 construct_entity_view_with_node(
-                    &entity,
+                    *entity,
                     child.to_owned(),
                     serial_server_data.clone(),
                 )
@@ -175,7 +178,7 @@ async fn construct_entity_view_with_node(
         } => {
             for child in child_nodes.into_iter() {
                 construct_entity_view_with_node(
-                    &entity,
+                    entity,
                     child.to_owned(),
                     serial_server_data.clone(),
                 )
@@ -185,6 +188,7 @@ async fn construct_entity_view_with_node(
         }
         #[cfg(target_arch = "wasm32")]
         Node::Expression(id, expr) => {
+            use web_sys::window;
             let document = window()
                 .expect("No window")
                 .document()
@@ -193,7 +197,7 @@ async fn construct_entity_view_with_node(
             let host_component: web_sys::Element;
             {
                 let world = WORLD.read().unwrap();
-                let entity_ref = world.entity(*entity);
+                let entity_ref = world.entity(entity);
                 let selector = entity_ref
                     .get::<Selector>()
                     .expect("Entity needs a selector");

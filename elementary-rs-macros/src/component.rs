@@ -56,6 +56,7 @@ pub fn component(input: TokenStream) -> TokenStream {
                   elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
                   elementary_rs_lib::tag::Tag(#tag.to_string())
                 ));
+                println!("Spawned entity: {:?}", entity.id());
 
                 #client_insert
 
