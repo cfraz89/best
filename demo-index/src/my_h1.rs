@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
 use elementary_rs_lib::{
-    node::{Node, NodeRef, View},
+    node::{NodeRef, View},
     signal::Signal,
 };
 use elementary_rs_macros::{hydrate, view, Component};
 use serde::{Deserialize, Serialize};
 
-#[derive(Component, bevy_ecs::component::Component, Clone, Serialize, Deserialize)]
+#[derive(Component, bevy_ecs::component::Component, Clone, Serialize, Deserialize, Debug)]
 pub struct MyH1 {
     pub name: String,
 }
@@ -26,7 +24,7 @@ impl View for MyH1 {
 }
 
 impl MyH1 {
-    // #[hydrate]
+    #[hydrate]
     async fn my_title(&self) -> String {
         "Server title".to_string()
     }

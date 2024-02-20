@@ -1,11 +1,8 @@
 mod my_h1;
 
-use std::sync::Arc;
-
 use elementary_rs_lib::{
-    node::{Node, NodeRef, View},
+    node::{NodeRef, View},
     page::Page,
-    signal::Signal,
 };
 use elementary_rs_macros::{view, Component};
 use my_h1::MyH1;

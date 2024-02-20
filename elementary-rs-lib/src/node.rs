@@ -15,7 +15,7 @@ use crate::{
     tag::Tag,
     world::WORLD,
 };
-use bevy_ecs::{component::Component, entity::Entity};
+use bevy_ecs::{component::Component, entity::Entity, world::World};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use web_sys::{window, Comment, TreeWalker};
@@ -294,7 +294,7 @@ if #[cfg(not(target_arch = "wasm32"))] {
 
     use std::fmt::{Write};
     impl Node {
-        pub fn render(&self) -> Result<String, std::fmt::Error> {
+        pub fn render(&self, world: &World) -> Result<String, std::fmt::Error> {
             match self {
                 Node::Text(string) => Ok(string.to_owned()),
                 Node::HtmlElement {
@@ -314,7 +314,7 @@ if #[cfg(not(target_arch = "wasm32"))] {
                     } else {
                         write!(output, " >")?;
                         for child in child_nodes.iter() {
-                            output.write_str(child.0.render()?.as_str())?;
+                            output.write_str(child.0.render(world)?.as_str())?;
                         }
                         write!(output, "</{}>", tag)?;
                     }
@@ -325,7 +325,6 @@ if #[cfg(not(target_arch = "wasm32"))] {
                     child_nodes,
                 } => {
                     let mut output = String::new();
-                    let world = WORLD.read().unwrap();
                     let entity_ref = world.entity(*entity);
                     let tag = entity_ref.get::<Tag>().expect("No tag on entity");
                     let selector = entity_ref.get::<Selector>().expect(format!("No selector on entity {:?}", entity).as_str());
@@ -340,10 +339,10 @@ if #[cfg(not(target_arch = "wasm32"))] {
                         "<{} {}><template shadowrootmode=\"open\">{}</template>",
                         tag.0,
                         selector_attr,
-                        node_ref.render()?
+                        node_ref.render(world)?
                     )?;
                     for child in child_nodes.iter() {
-                        output.write_str(child.0.render()?.as_str())?;
+                        output.write_str(child.0.render(world)?.as_str())?;
                     }
                     write!(output, "</{}>", tag.0)?;
                     Ok(output)

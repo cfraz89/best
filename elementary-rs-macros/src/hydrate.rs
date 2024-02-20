@@ -27,20 +27,41 @@ pub fn hydrate(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(not(target_arch = "wasm32"))]
         #sig {
             let data = self.#hidden_ident(#hidden_args)#await_tokens;
-            let mut server_data = self._context.server_data.lock().unwrap();
-            server_data.insert(#hidden_name.to_string(), serde_json::to_value(&data).unwrap());
-            data
+            let mut world = elementary_rs_lib::world::WORLD.write().unwrap();
+            //Self is a elementary component and bevy component
+                    println!("Self: {:?}", self);
+            for (page, entity, mut server_data) in world.query::<(&Self, bevy_ecs::entity::Entity, Option<&mut elementary_rs_lib::server_data::ServerData>)>().iter_mut(&mut world) {
+                    println!("Page: {:?}, Entity: {:?}, Self: {:?}", page, entity, self);
+                if std::ptr::eq(page, self) {
+                    println!("Found server data");
+                    if let Some(mut server_data) = server_data {
+                        server_data.insert(#hidden_name.to_string(), serde_json::to_value(&data).unwrap());
+                    } else {
+                        let mut new_server_data = elementary_rs_lib::server_data::ServerData::default();
+                        new_server_data.insert(#hidden_name.to_string(), serde_json::to_value(&data).unwrap());
+                        world.entity_mut(entity).insert(new_server_data);
+                    }
+                    return data;
+                } 
+            }
+            panic!("Unable to store server data!");
         }
 
         //On the client, load the serialized data
         #[cfg(target_arch = "wasm32")]
         #sig {
-            web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!("{:?}", self._context)));
-            if let Some(data) = self._context.server_data.lock().unwrap().get(#hidden_name) {
-                serde_json::from_value(data.clone()).expect("No server data to load!")
-            } else {
-                panic!("No server data")
+            let mut world = elementary_rs_lib::world::WORLD.write().unwrap();
+            //Self is a elementary component and bevy component
+            for (page,  server_data) in world.query::<(&Self, &elementary_rs_lib::server_data::ServerData)>().iter(&mut world) {
+                if std::ptr::eq(page, self) {
+                    if let Some(data) = server_data.get(#hidden_name) {
+                        return serde_json::from_value(data.clone()).expect("No server data to load!")
+                    } else {
+                        panic!("No server data")
+                    }
+                }
             }
+            panic!("Did not find server data!");
         }
     }
     .into()

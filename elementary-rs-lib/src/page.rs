@@ -1,17 +1,15 @@
-use bevy_ecs::entity::Entity;
-
 use crate::{
     component::Component,
-    hydration_fn_name::{self, HydrationFnName},
-    js_path::{self, JSPath},
-    node::{construct_entity_view, AnyView, Node, NodeRef, View},
-    server_data::{SerialServerData, ServerData},
+    hydration_fn_name::HydrationFnName,
+    js_path::JSPath,
+    node::{construct_entity_view, NodeRef},
     world::WORLD,
 };
 
 cfg_if::cfg_if! {
     if #[cfg(not(target_arch = "wasm32"))] {
         use crate::selector::Selector;
+        use crate::server_data::ServerData;
 
         pub trait Page: Component {
             async fn render(self) -> Result<String, serde_json::Error> {
@@ -27,11 +25,11 @@ cfg_if::cfg_if! {
                     hydration_fn_name = entity_ref.get::<HydrationFnName>().cloned();
                 }
                 construct_entity_view(&entity, None).await.expect("failed constructing view");
+                let res: String;
                 {
                     let world = WORLD.read().unwrap();
                     let entity_ref = world.entity(entity);
-
-                    let rendered_node = entity_ref.get::<NodeRef>().expect("page has no node").render().expect("Render didnt give any output!");
+                    let rendered_node = entity_ref.get::<NodeRef>().expect("page has no node").render(&world).expect("Render didnt give any output!");
                     let selector = entity_ref.get::<Selector>().to_owned().expect("Entity needs a selector");
                     let selector_attr = match selector {
                                             Selector::Id(id) => format!("id=\"_{id}\""),
@@ -45,33 +43,38 @@ cfg_if::cfg_if! {
                         }
                         _ => Ok("".to_string())
                     }?;
-                    Ok(format!(
+                    res = format!(
                         "<!doctype html><html><head></head><body {selector_attr}>{rendered_node}{script}</body></html>",
 
-                    ))
+                    );
                 }
+                {
+                    WORLD.write().unwrap().clear_all();
+                }
+                    println!("Cleared world");
+                    Ok(res)
             }
         }
 
     } else {
-
             use gloo_utils::format::JsValueSerdeExt;
             use serde::de::Deserialize;
             use wasm_bindgen::JsValue;
-        pub trait Page: Component {
-            async fn hydrate(
-                serial_page: JsValue,
-                serial_server_data: JsValue,
-            ) -> Result<(), JsValue> {
-                let page: Self = serial_page
-                    .into_serde()
-                    .expect("Could not deserialize initial value!");
-                let serial_server_data: SerialServerData = serial_server_data
-                    .into_serde()
-                    .expect("Could not deserialize server data!");
-                construct_entity_view(&page.build_entity(), Some(serial_server_data)).await?;
-                Ok(())
+            use crate::server_data::SerialServerData;
+            pub trait Page: Component {
+                async fn hydrate(
+                    serial_page: JsValue,
+                    serial_server_data: JsValue,
+                ) -> Result<(), JsValue> {
+                    let page: Self = serial_page
+                        .into_serde()
+                        .expect("Could not deserialize initial value!");
+                    let serial_server_data: SerialServerData = serial_server_data
+                        .into_serde()
+                        .expect("Could not deserialize server data!");
+                    construct_entity_view(&page.build_entity(), Some(serial_server_data)).await?;
+                    Ok(())
+                }
             }
-        }
     }
 }

@@ -1,7 +1,7 @@
 use crate::template_node::{self, TemplateNode};
-use proc_macro::{token_stream::IntoIter, Literal, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
 use quote::ToTokens;
-use std::{collections::HashMap, iter::Peekable, sync::Arc};
+use std::{iter::Peekable, sync::Arc};
 use tap::Tap;
 
 /// Parse a html-like template into a TemplateNode. Then emit its token stream, which will generate a Node
