@@ -61,8 +61,9 @@ cfg_if::cfg_if! {
     fn build_component_template(world: &mut World, entity: Entity) {
         let entity_ref = world.entity(entity);
         let component = entity_ref.get::<AnyWebComponent>().expect("Entity needs a component").clone();
+        let template = component.template();
         let task = IoTaskPool::get().spawn(async move {
-            component.template().await
+            template.await
     });
         world.entity_mut(entity).insert(BuildTemplate(task));
     }

@@ -19,7 +19,7 @@ pub struct Index {
 }
 
 impl WebComponent for Index {
-    async fn template(&self) -> NodeRef {
+    async fn template(self) -> NodeRef {
         view!(
             <div>
                 <MyH1 title="Hello">
@@ -40,7 +40,7 @@ pub struct MyH1 {
 }
 
 impl WebComponent for MyH1 {
-    async fn template(&self) -> NodeRef {
+    async fn template(self) -> NodeRef {
         view! {
             <div>
                 <h1 style="color: red;">{self.title}</h1>

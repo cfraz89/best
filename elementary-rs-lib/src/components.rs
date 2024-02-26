@@ -15,15 +15,15 @@ pub struct JSPath(pub String);
 pub struct Tag(pub String);
 
 pub trait WebComponent {
-    fn template(&self) -> impl Future<Output = NodeRef> + Send + '_;
+    fn template(self) -> impl Future<Output = NodeRef> + Send + '_;
 }
 
 pub trait DynWebComponent {
-    fn template(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>>;
+    fn template(self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>>;
 }
 
 impl<T: WebComponent<template(): Send> + 'static> DynWebComponent for T {
-    fn template(&self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>> {
+    fn template(self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>> {
         Box::pin(WebComponent::template(self))
     }
 }
