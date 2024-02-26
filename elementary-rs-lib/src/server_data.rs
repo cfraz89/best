@@ -85,14 +85,14 @@ impl SerialServerData {
     /// Walk the tree and extract server data from all the node's child component entities into our serial_server_data
     fn extract_node_server_data(&mut self, from: &NodeRef) {
         match from.as_ref() {
-            Node::Component {
+            Node::Component(
                 entity,
-                child_nodes,
-            } => {
+                // child_nodes,
+            ) => {
                 self.extend(ServerData::get_serial_server_data(entity).0.into_iter());
-                for child in child_nodes.iter() {
-                    self.extract_node_server_data(child);
-                }
+                // for child in child_nodes.iter() {
+                //     self.extract_node_server_data(child);
+                // }
             }
             Node::HtmlElement {
                 element: _,

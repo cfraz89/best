@@ -1,10 +1,7 @@
 use std::{
-    borrow::BorrowMut,
-    future::Future,
     marker::PhantomData,
-    ops::{Deref, DerefMut},
-    pin::Pin,
-    sync::{Arc, Mutex, MutexGuard},
+    ops::{Deref},
+    sync::{Arc, Mutex},
 };
 
 use bevy_ecs::{component::Component, entity::Entity};

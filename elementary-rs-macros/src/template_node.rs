@@ -70,14 +70,12 @@ impl ToTokens for TemplateNode {
                         }
                     });
                     quote! {
-                        elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::Component {
+                        elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::Component(
                             entity: elementary_rs_lib::component::Component::build_entity(#name_ident {
                                         #(#properties),*
-                                    }),
-                            child_nodes: vec![#(#child_nodes),*]
-                        })
-                    }
-                    .into()
+                                    }, vec![#(#child_nodes),*])
+                        ))
+                    }.into()
                 }
                 TemplateNode::Expression(tokens) => {
                     let mut hasher = DefaultHasher::new();

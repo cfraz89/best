@@ -19,3 +19,4 @@ wasm-bindgen-futures = "0.4.40"
 tower-http = { version = "0.5.1", features = ["fs"] }
 elementary-rs-macros = { version = "0.1.0", path = "../elementary-rs-macros" }
 axum-macros = "0.4.1"
+bevy = "0.13.0"

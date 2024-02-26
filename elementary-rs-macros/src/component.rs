@@ -12,7 +12,7 @@ pub struct ComponentOps {
     js_path: Option<String>,
 }
 
-pub fn component(input: TokenStream) -> TokenStream {
+pub fn build_component(input: TokenStream) -> TokenStream {
     let mut hasher = DefaultHasher::new();
     input.to_string().hash(&mut hasher);
     let hash = hasher.finish();
@@ -31,8 +31,8 @@ pub fn component(input: TokenStream) -> TokenStream {
         let hydrate_ident = Ident::new(&hydrate_str, ident.span());
         (
             quote! {
-                entity.insert(elementary_rs_lib::js_path::JSPath(#js_path.to_string()));
-                entity.insert(elementary_rs_lib::hydration_fn_name::HydrationFnName(#hydrate_str.to_string()));
+                entity.insert(elementary_rs_lib::components::JSPath(#js_path.to_string()));
+                entity.insert(elementary_rs_lib::components::HydrationFnName(#hydrate_str.to_string()));
             },
             quote! {
                 #[cfg(target_arch = "wasm32")]
@@ -47,14 +47,13 @@ pub fn component(input: TokenStream) -> TokenStream {
     };
 
     quote! {
-        impl elementary_rs_lib::component::Component for #ident {
-            fn build_entity(self) -> bevy_ecs::entity::Entity {
-                let mut world = elementary_rs_lib::world::WORLD.write().unwrap();
-
-                let mut entity = world.spawn((
-                  elementary_rs_lib::node::AnyView(std::sync::Arc::new(self)),
-                  elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
-                  elementary_rs_lib::tag::Tag(#tag.to_string())
+        impl elementary_rs_lib::components::BuildWebComponent for #ident {
+            fn build_entity(self, mut commands: bevy::prelude::Commands, child_nodes: Vec<elementary_rs_lib::node::NodeRef>) -> bevy::prelude::Entity {
+                let mut entity = commands.spawn((
+                  elementary_rs_lib::components::AnyWebComponent(std::sync::Arc::new(self)),
+                  elementary_rs_lib::components::WebComponentChildren(child_nodes),
+                //   elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
+                  elementary_rs_lib::components::Tag(#tag.to_string())
                 ));
                 println!("Spawned entity: {:?}", entity.id());
 

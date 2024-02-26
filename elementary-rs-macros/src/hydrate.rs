@@ -32,6 +32,7 @@ pub fn hydrate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             //Self is a elementary component and bevy component
                     println!("Self: {:?}", self);
             for (mut entity, view, mut server_data) in world.query::<(Entity, &elementary_rs_lib::node::AnyView, Option<&mut elementary_rs_lib::server_data::ServerData>)>().iter_mut(&mut world) {
+                /// TODO need to find a way to link the current view to its server tdata
                 // if std::ptr::eq(*view.0.as_ref() as *const _, *self as *const _) {
                     println!("Found server data");
                     if let Some(mut server_data) = server_data {

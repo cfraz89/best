@@ -5,7 +5,9 @@ use axum::{
     routing::get,
     Router,
 };
+use bevy::prelude::*;
 use demo_index::IndexPage;
+use demo_index::{render_page, setup_page};
 use elementary_rs_lib::{page::Page, signal::Signal};
 use tower_http::services::ServeDir;
 use wasm_bindgen::prelude::*;
@@ -28,11 +30,16 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    let page = IndexPage { x: 20 }
-        .render()
-        .await
-        .expect("Render page didnt return!");
-    Html(page)
+    // let page = IndexPage { x: 20 }
+    //     .render()
+    //     .await
+    //     .expect("Render page didnt return!");
+
+    App::new()
+        .add_systems(Startup, setup_page)
+        .add_systems(Update, render_page)
+        .run();
+    Html("hi")
 }
 
 #[wasm_bindgen(start)]
