@@ -67,7 +67,12 @@ pub trait BuildWebComponent {
 
 ///Used to manage async building of templates
 #[derive(Component)]
-pub struct BuildTemplate(pub AnyWebComponent);
+pub struct BuildTemplate;
 
+///Holds generated template after template function has completed
 #[derive(Component)]
 pub struct Template(pub NodeRef);
+
+///Marker that this is the page we are rendering
+#[derive(Component)]
+pub struct Page;

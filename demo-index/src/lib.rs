@@ -2,14 +2,15 @@
 
 use bevy::prelude::*;
 use bevy_ecs::system::EntityCommands;
-use elementary_rs_lib::components::WebComponent;
+use elementary_rs_lib::components::{BuildWebComponent, Page, WebComponent};
 use elementary_rs_lib::node::NodeRef;
 use elementary_rs_macros::{view, BuildComponent};
 use serde::{Deserialize, Serialize};
 
 //Called to setup the page
-pub fn setup_page(mut commands: Commands) {
-    commands.spawn((Index { x: 20 }, Page));
+pub fn setup_page(world: &mut World) {
+    let page = Index { x: 20 }.build_entity(world, vec![]);
+    world.entity_mut(page).insert(Page);
 }
 
 #[derive(Component, BuildComponent, Clone, Serialize, Deserialize)]
@@ -30,9 +31,6 @@ impl WebComponent for Index {
         )
     }
 }
-
-#[derive(Component)]
-pub struct Page;
 
 #[derive(Component, BuildComponent, Debug, Clone)]
 pub struct MyH1 {

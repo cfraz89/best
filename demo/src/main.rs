@@ -7,7 +7,7 @@ use axum::{
 };
 use bevy::prelude::*;
 use demo_index::setup_page;
-use elementary_rs_lib::signal::Signal;
+use elementary_rs_lib::{build::render_component_instance, components::Page, signal::Signal};
 use tower_http::services::ServeDir;
 use wasm_bindgen::prelude::*;
 
@@ -34,8 +34,16 @@ async fn root() -> impl IntoResponse {
     //     .await
     //     .expect("Render page didnt return!");
 
-    App::new().add_systems(Startup, setup_page).run();
-    Html("hi")
+    let mut app = App::new();
+    app.add_systems(Startup, setup_page).update();
+    let page = app
+        .world
+        .query_filtered::<Entity, With<Page>>()
+        .get_single(&app.world)
+        .unwrap();
+    let response =
+        render_component_instance(&app.world, page).expect("Couldn't generate a response");
+    Html(response.to_string())
 }
 
 #[wasm_bindgen(start)]
