@@ -1,5 +1,5 @@
 use crate::template_node::{self, TemplateNode};
-use proc_macro::{token_stream::IntoIter, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::{token_stream::IntoIter, Ident, Spacing, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use std::{iter::Peekable, sync::Arc};
 use tap::Tap;
@@ -7,8 +7,27 @@ use tap::Tap;
 /// Parse a html-like template into a TemplateNode. Then emit its token stream, which will generate a Node
 pub fn view(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
-    match parse_node(iter) {
-        Ok(Some(node)) => node.tap(|n| println!("{:?}", n)).to_token_stream().into(),
+    let world_identifier = match take_token(iter, "world variable".to_string())
+        .expect("Couldn't read world variable")
+    {
+        TokenTree::Ident(i) => i,
+        t => {
+            t.span()
+                .error(format!(
+                    "invalid token, expected world variable identifier, found {t}"
+                ))
+                .emit();
+            panic!("Failed to parse element! macro");
+        }
+    };
+    parse_punct(
+        &take_token(iter, ','.to_string()).expect("Expecting comma"),
+        ',',
+    )
+    .expect("Couldn't read comma");
+
+    match parse_node(iter, &world_identifier) {
+        Ok(Some(node)) => node.to_token_stream().into(),
         Ok(None) => panic!("Didn't read any nodes"),
         Err(ParseError::EndOfInput { expected }) => {
             panic!("Unexpected end of input, expected {}", expected)
@@ -236,7 +255,10 @@ fn parse_attribute(
 }
 
 /// Parse a html-like macro template into a TemplateNode
-fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<Option<TemplateNode>, ParseError> {
+fn parse_node(
+    iter: &mut Peekable<IntoIter>,
+    world_identifier: &Ident,
+) -> Result<Option<TemplateNode>, ParseError> {
     let mut token: TokenTree;
     //Decide wether we're parsing this node as text or an expression first
     token = peek_token(iter, "text".to_string())?;
@@ -274,7 +296,7 @@ fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<Option<TemplateNode>, Par
         println!("Got text: {t}");
         Ok(Some(TemplateNode::Text(t)))
     } else {
-        Ok(Some(match parse_element(iter)? {
+        Ok(Some(match parse_element(iter, world_identifier)? {
             Element::Html {
                 element,
                 child_nodes,
@@ -288,6 +310,10 @@ fn parse_node(iter: &mut Peekable<IntoIter>) -> Result<Option<TemplateNode>, Par
             } => TemplateNode::ComponentElement {
                 element,
                 child_nodes,
+                world_identifier: proc_macro2::Ident::new(
+                    &world_identifier.to_string(),
+                    world_identifier.span().into(),
+                ),
             },
         }))
     }
@@ -306,7 +332,10 @@ enum Element {
 
 /// Parse an element tag, which may be a html element or a custom element
 /// If its a custom element, we just keep the raw tokens for each attribute
-fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
+fn parse_element(
+    iter: &mut Peekable<IntoIter>,
+    world_identifier: &Ident,
+) -> Result<Element, ParseError> {
     //Parse opening tag opening bracket
     parse_punct(&take_token(iter, '<'.to_string())?, '<')?;
     //Parse tag name
@@ -329,7 +358,7 @@ fn parse_element(iter: &mut Peekable<IntoIter>) -> Result<Element, ParseError> {
     let mut child_nodes = Vec::<TemplateNode>::new();
 
     while peek_end_tag(iter).is_err() {
-        if let Some(node) = parse_node(iter)? {
+        if let Some(node) = parse_node(iter, world_identifier)? {
             child_nodes.push(node);
         }
     }

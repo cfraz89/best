@@ -15,6 +15,7 @@ pub enum TemplateNode {
     ComponentElement {
         element: ComponentElement,
         child_nodes: Arc<Vec<TemplateNode>>,
+        world_identifier: Ident,
     },
     Expression(TokenStream),
 }
@@ -62,6 +63,7 @@ impl ToTokens for TemplateNode {
                 TemplateNode::ComponentElement {
                     element: ComponentElement { name, properties },
                     child_nodes,
+                    world_identifier
                 } => {
                     let name_ident = format_ident!("{}", name);
                     let properties = properties.iter().map(|(k, v)| {
@@ -71,9 +73,9 @@ impl ToTokens for TemplateNode {
                     });
                     quote! {
                         elementary_rs_lib::node::NodeRef::from(elementary_rs_lib::node::Node::Component(
-                            entity: elementary_rs_lib::component::Component::build_entity(#name_ident {
-                                        #(#properties),*
-                                    }, vec![#(#child_nodes),*])
+                            elementary_rs_lib::components::BuildWebComponent::build_entity(#name_ident {
+                                #(#properties),*
+                            }, #world_identifier, vec![#(#child_nodes),*])
                         ))
                     }.into()
                 }

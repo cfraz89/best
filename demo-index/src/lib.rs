@@ -12,15 +12,15 @@ pub fn setup_page(mut commands: Commands) {
     commands.spawn((Index { x: 20 }, Page));
 }
 
-#[derive(Component, BuildComponent, Serialize, Deserialize)]
+#[derive(Component, BuildComponent, Clone, Serialize, Deserialize)]
 #[page(js_path = "./wasm/demo_index.js")]
 pub struct Index {
     pub x: i32,
 }
 
 impl WebComponent for Index {
-    async fn template(self) -> NodeRef {
-        view!(
+    async fn template(self, world: &mut World) -> NodeRef {
+        view!(world,
             <div>
                 <MyH1 title="Hello">
                     <slot />
@@ -34,18 +34,18 @@ impl WebComponent for Index {
 #[derive(Component)]
 pub struct Page;
 
-#[derive(Component, Debug)]
+#[derive(Component, BuildComponent, Debug, Clone)]
 pub struct MyH1 {
     pub title: String,
 }
 
 impl WebComponent for MyH1 {
-    async fn template(self) -> NodeRef {
-        view! {
+    async fn template(self, world: &mut World) -> NodeRef {
+        view!(world,
             <div>
                 <h1 style="color: red;">{self.title}</h1>
                 <slot />
             </div>
-        }
+        )
     }
 }

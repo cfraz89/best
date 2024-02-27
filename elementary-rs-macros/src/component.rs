@@ -48,12 +48,14 @@ pub fn build_component(input: TokenStream) -> TokenStream {
 
     quote! {
         impl elementary_rs_lib::components::BuildWebComponent for #ident {
-            fn build_entity(self, mut commands: bevy::prelude::Commands, child_nodes: Vec<elementary_rs_lib::node::NodeRef>) -> bevy::prelude::Entity {
-                let mut entity = commands.spawn((
-                  elementary_rs_lib::components::AnyWebComponent(std::sync::Arc::new(self)),
-                  elementary_rs_lib::components::WebComponentChildren(child_nodes),
-                //   elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
-                  elementary_rs_lib::components::Tag(#tag.to_string())
+            fn build_entity(self, world: &mut bevy::prelude::World, child_nodes: Vec<elementary_rs_lib::node::NodeRef>) -> bevy::prelude::Entity {
+                let web_component = elementary_rs_lib::components::AnyWebComponent(std::sync::Arc::new(self));
+                let mut entity = world.spawn((
+                    web_component.clone(),
+                    elementary_rs_lib::components::BuildTemplate(web_component),
+                    elementary_rs_lib::components::WebComponentChildren(child_nodes),
+                    //   elementary_rs_lib::selector::Selector::Id(#hash.to_string()),
+                    elementary_rs_lib::components::Tag(#tag.to_string())
                 ));
                 println!("Spawned entity: {:?}", entity.id());
 

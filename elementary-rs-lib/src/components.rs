@@ -14,17 +14,23 @@ pub struct JSPath(pub String);
 #[derive(Component, Debug, Clone)]
 pub struct Tag(pub String);
 
-pub trait WebComponent {
-    fn template(self) -> impl Future<Output = NodeRef> + Send + '_;
+pub trait WebComponent: Clone {
+    fn template(self, world: &mut World) -> impl Future<Output = NodeRef> + Send;
 }
 
 pub trait DynWebComponent {
-    fn template(self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>>;
+    fn template<'a>(
+        &'a self,
+        world: &'a mut World,
+    ) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>>;
 }
 
 impl<T: WebComponent<template(): Send> + 'static> DynWebComponent for T {
-    fn template(self) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>> {
-        Box::pin(WebComponent::template(self))
+    fn template<'a>(
+        &'a self,
+        world: &'a mut World,
+    ) -> Pin<Box<dyn Future<Output = NodeRef> + Send + '_>> {
+        Box::pin(WebComponent::template(self.clone(), world))
     }
 }
 
@@ -56,5 +62,12 @@ pub struct WebComponentChildren(pub Vec<NodeRef>);
 
 ///Used by derive macro to construct our entities
 pub trait BuildWebComponent {
-    fn build_entity(self, commands: Commands, child_nodes: Vec<NodeRef>) -> Entity;
+    fn build_entity(self, world: &mut World, child_nodes: Vec<NodeRef>) -> Entity;
 }
+
+///Used to manage async building of templates
+#[derive(Component)]
+pub struct BuildTemplate(pub AnyWebComponent);
+
+#[derive(Component)]
+pub struct Template(pub NodeRef);

@@ -1,14 +1,8 @@
-use crate::components::{AnyWebComponent, Tag, WebComponentChildren};
+use crate::components::{AnyWebComponent, Tag, Template, WebComponentChildren};
 use bevy::tasks::{block_on, futures_lite::future, IoTaskPool, Task};
 use bevy_ecs::prelude::*;
 use either::{Either, Left, Right};
 use std::ops::Deref;
-
-#[derive(Component)]
-pub struct BuildTemplate(Task<NodeRef>);
-
-#[derive(Component)]
-pub struct Template(NodeRef);
 
 impl Deref for Template {
     type Target = NodeRef;
@@ -35,17 +29,6 @@ cfg_if::cfg_if! {
     // ) -> String {
     // }
 
-    //system
-    pub fn build_component_templates(
-        world: &mut World,
-        query: Query<Entity, With<AnyWebComponent>>,
-    ) {
-        for entity in &query {
-            build_component_template(world, entity);
-        }
-    }
-
-
     // pub fn render_component_instance(world: &mut World, entity: Entity, tag: &Tag, child_nodes: &Vec<NodeRef>) -> Result<String, std::fmt::Error> {
     //     if let Some(task) = render_component {
     //         if let Some(output) = block_on(future::poll_once(&mut task.0)) {
@@ -58,16 +41,7 @@ cfg_if::cfg_if! {
     //     }
     // }
 
-    fn build_component_template(world: &mut World, entity: Entity) {
-        let entity_ref = world.entity(entity);
-        let component = entity_ref.get::<AnyWebComponent>().expect("Entity needs a component").clone();
-        let template = component.template();
-        let task = IoTaskPool::get().spawn(async move {
-            template.await
-    });
-        world.entity_mut(entity).insert(BuildTemplate(task));
-    }
-
+    //Render components instance, will be partial if template doesn't exist yet
     pub fn render_component_instance(world: &World, entity: Entity) -> Result<Either<String, String>, std::fmt::Error> {
         let entity_ref = world.entity(entity);
         let tag = entity_ref.get::<Tag>().expect("Entity needs a tag").clone();
@@ -108,6 +82,7 @@ cfg_if::cfg_if! {
     }
 
 
+    ///Render a node instance, will be partial if component templates don't exist yet
     pub fn render_node_instance(world: &World, node: &Node) -> Result<Either<String, String>, std::fmt::Error> {
         match node {
             Node::Text(string) => Ok(Right(string.to_owned())),
