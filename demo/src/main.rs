@@ -1,13 +1,14 @@
 #![recursion_limit = "512"]
 
 use axum::{
+    body::Body,
     response::{Html, IntoResponse},
     routing::get,
     Router,
 };
-use bevy::prelude::*;
-use demo_index::setup_page;
-use elementary_rs_lib::{build::render_component_instance, components::Page, signal::Signal};
+use bevy::{prelude::*, tasks::futures_lite::stream};
+// use demo_index::setup_page;
+use elementary_rs_lib::{components::Page, html_render::render_component_instance, signal::Signal};
 use tower_http::services::ServeDir;
 use wasm_bindgen::prelude::*;
 
@@ -29,21 +30,19 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    // let page = IndexPage { x: 20 }
-    //     .render()
-    //     .await
-    //     .expect("Render page didnt return!");
-
     let mut app = App::new();
-    app.add_systems(Startup, setup_page).update();
-    let page = app
-        .world
-        .query_filtered::<Entity, With<Page>>()
-        .get_single(&app.world)
-        .unwrap();
-    let response =
-        render_component_instance(&app.world, page).expect("Couldn't generate a response");
-    Html(response.to_string())
+    app.add_plugins(render_html_plugin);
+    // let mut app = App::new();
+    // app.add_systems(Startup, setup_page).update();
+    // let page = app
+    //     .world
+    //     .query_filtered::<Entity, With<Page>>()
+    //     .get_single(&app.world)
+    //     .unwrap();
+    // let response =
+    //     render_component_instance(&app.world, page).expect("Couldn't generate a response");
+    // Html(response.to_string())
+    Body::from_stream(stream::poll_fn(f))
 }
 
 #[wasm_bindgen(start)]

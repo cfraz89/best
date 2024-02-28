@@ -22,13 +22,28 @@ pub struct Index {
 impl WebComponent for Index {
     async fn template(self, world: &mut World) -> NodeRef {
         view!(world,
-            <div>
-                <MyH1 title="Hello">
-                    <slot />
-                </MyH1>
-                {self.x * 10}
-            </div>
-        )
+            <Div> {
+                <If(true)> {
+                    <MyH1 Title("Hello")> {
+                        <Text("World")>
+                    }
+                    <Div> {
+                        <Text("Hello")>
+                    }
+                }
+                <Else> {
+                    Text("Blah")
+                }
+                <SomeComponent>
+            })
+        }
+        //     <div>
+        //         <MyH1 title="Hello">
+        //             <slot />
+        //         </MyH1>
+        //         {self.x * 10}
+        //     </div>
+        // )
     }
 }
 
