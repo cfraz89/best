@@ -5,9 +5,9 @@ use bevy::prelude::*;
 use super::attributes::RenderAttributes;
 
 #[derive(Component, Debug)]
-pub struct StyleAttr(pub HashMap<&'static str, &'static str>);
+pub struct Styles(pub HashMap<&'static str, &'static str>);
 
-pub fn apply_styles(mut commands: Commands, query: Query<(Entity, &RenderAttributes, &StyleAttr)>) {
+pub fn apply_styles(mut commands: Commands, query: Query<(Entity, &RenderAttributes, &Styles)>) {
     for (entity, render_attributes, style) in &query {
         let mut new_attributes = render_attributes.0.clone();
         let added_style = style

@@ -1,5 +1,5 @@
-use axum::{body::Body, response::IntoResponse, routing::get, Router};
-use hevy::html::{plugin::RenderHtmlPlugin, stream::AppHtmlStream};
+use axum::{response::IntoResponse, routing::get, Router};
+use hevy::axum_html::AxumHtmlApp;
 use tower_http::services::ServeDir;
 
 use bevy::prelude::*;
@@ -24,18 +24,16 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    let mut app = App::new();
-    app.add_plugins(RenderHtmlPlugin);
-    app.add_systems(Startup, init_page);
-    Body::from_stream(AppHtmlStream::new(app))
+    AxumHtmlApp::new(init_page)
 }
 
 pub fn init_page(mut commands: Commands) {
     ecn!(commands,
-    <Div Page> {
-        "Hello"
-        <Div StyleAttr(hash_map! {"color" => "red"})> {
-            "Yolo"
+        <Div Page> {
+            "Hello"
+            <Div Styles(hash_map! {"color" => "red"})> {
+                "Yolo"
+            }
         }
-    });
+    );
 }
