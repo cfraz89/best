@@ -2,10 +2,10 @@ use std::{iter::Peekable, sync::Arc};
 
 use proc_macro2::{token_stream::IntoIter, Delimiter, Ident, Punct, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens, TokenStreamExt};
-use syn::parse::Parse;
 
 use crate::entity_node::EntityNode;
 
+/// Parse a entity component notation macro template into a TemplateNode
 pub fn ecn(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
     let commands_identifier = match take_token(iter, "commands".to_string())
@@ -92,7 +92,7 @@ fn parse_punct(input: &TokenTree, punct: char) -> Result<(), ParseError> {
     }
 }
 
-/// Parse a html-like macro template into a TemplateNode
+/// Parse an entity node, which takes the form <component1 component2> { children...} or "text"
 fn parse_entity(
     builder_identifier: Ident,
     iter: &mut Peekable<IntoIter>,
@@ -120,6 +120,7 @@ fn parse_entity(
     }
 }
 
+/// Parse components of an entity node, which is a space seperated list of struct initializers
 fn parse_components(
     builder_identifier: Ident,
     iter: &mut Peekable<IntoIter>,
@@ -142,7 +143,6 @@ fn parse_components(
                     }
                     _ => {}
                 }
-                dbg!(tokens.clone());
             }
             TokenTree::Group(_) => {
                 tokens.append(token);
@@ -157,7 +157,6 @@ fn parse_components(
                     }
                     _ => {}
                 }
-                dbg!(tokens.clone());
             }
             _ => {}
         }

@@ -3,7 +3,7 @@
 use axum::{body::Body, response::IntoResponse, routing::get, Router};
 use bevy::prelude::*;
 use demo_index::init_page;
-use elementary_rs_lib::html::{plugin::RenderHtmlPlugin, stream::AppHtmlStream};
+use elementary::html::{plugin::RenderHtmlPlugin, stream::AppHtmlStream};
 use tower_http::services::ServeDir;
 
 #[tokio::main]

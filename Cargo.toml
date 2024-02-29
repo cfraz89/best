@@ -1,5 +1,5 @@
 [workspace]
-members = ["demo", "demo-index", "elementary-rs-lib", "elementary-rs-macros"]
+members = ["demo", "demo-index", "elementary", "elementary-macros"]
 resolver = "2"
 
 [profile.release]

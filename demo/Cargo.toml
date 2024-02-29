@@ -11,8 +11,7 @@ serde = { version = "1.0.195", features = ["derive"] }
 tokio = { version = "1.35.1", features = ["full"] }
 tracing-subscriber = "0.3.18"
 demo-index = { path = "../demo-index" }
-elementary-rs-lib = { path = "../elementary-rs-lib" }
+elementary = { path = "../elementary" }
 tower-http = { version = "0.5.1", features = ["fs"] }
-elementary-rs-macros = { version = "0.1.0", path = "../elementary-rs-macros" }
 axum-macros = "0.4.1"
 bevy = { version = "0.13.0", default-features = false }

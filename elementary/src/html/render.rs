@@ -4,7 +4,7 @@ use crate::text::Text;
 
 use super::{async_wait::AsyncWait, attributes::RenderAttributes, tag::Tag};
 use bevy::prelude::*;
-use std::{collections::HashMap, fmt::Write};
+use std::fmt::Write;
 
 #[derive(Component, Clone)]
 pub(crate) enum RenderTag {

@@ -665,8 +665,7 @@ dependencies = [
  "axum-macros",
  "bevy",
  "demo-index",
- "elementary-rs-lib",
- "elementary-rs-macros",
+ "elementary",
  "serde",
  "tokio",
  "tower-http",
@@ -678,8 +677,7 @@ name = "demo-index"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "elementary-rs-lib",
- "elementary-rs-macros",
+ "elementary",
 ]
 
 [[package]]
@@ -695,23 +693,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11157ac094ffbdde99aa67b23417ebdd801842852b500e395a45a9c0aac03e4a"
 
 [[package]]
-name = "elementary-rs-lib"
+name = "elementary"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_ecs",
  "either",
+ "elementary-macros",
  "map-macro",
  "thiserror",
  "uuid",
 ]
 
 [[package]]
-name = "elementary-rs-macros"
+name = "elementary-macros"
 version = "0.1.0"
 dependencies = [
  "darling",
- "elementary-rs-lib",
  "proc-macro2",
  "quote",
  "syn",
