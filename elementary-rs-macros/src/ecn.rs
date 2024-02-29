@@ -1,6 +1,6 @@
 use std::{iter::Peekable, sync::Arc};
 
-use proc_macro2::{token_stream::IntoIter, Delimiter, Ident, Span, TokenStream, TokenTree};
+use proc_macro2::{token_stream::IntoIter, Delimiter, Ident, Punct, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens, TokenStreamExt};
 use syn::parse::Parse;
 
@@ -127,9 +127,39 @@ fn parse_components(
     let mut tokens: TokenStream = TokenStream::new();
     loop {
         let token = take_token(iter, "component or >".to_string())?;
-        match token {
+        match token.clone() {
             TokenTree::Punct(p) if p.as_char() == '>' => break,
-            _ => tokens.append(token),
+            TokenTree::Ident(_) => {
+                tokens.append(token);
+                //Check if its another ident next, if so insert a comma
+                let next = peek_token(iter, "next component".to_string())?;
+                match next {
+                    TokenTree::Ident(_) => {
+                        tokens.append(TokenTree::Punct(Punct::new(
+                            ',',
+                            proc_macro2::Spacing::Joint,
+                        )));
+                    }
+                    _ => {}
+                }
+                dbg!(tokens.clone());
+            }
+            TokenTree::Group(_) => {
+                tokens.append(token);
+                //Check if its another ident next, if so insert a comma
+                let next = peek_token(iter, "next component".to_string())?;
+                match next {
+                    TokenTree::Ident(_) => {
+                        tokens.append(TokenTree::Punct(Punct::new(
+                            ',',
+                            proc_macro2::Spacing::Joint,
+                        )));
+                    }
+                    _ => {}
+                }
+                dbg!(tokens.clone());
+            }
+            _ => {}
         }
     }
     let mut child_nodes = vec![];
@@ -139,7 +169,6 @@ fn parse_components(
             let mut inner = g.stream().into_iter().peekable();
             loop {
                 let child = parse_entity(Ident::new("builder", next.clone()?.span()), &mut inner)?;
-                dbg!(child.clone());
                 if let Some(child) = child {
                     child_nodes.push(child);
                 } else {

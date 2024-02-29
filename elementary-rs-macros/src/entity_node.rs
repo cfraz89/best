@@ -20,7 +20,7 @@ impl ToTokens for EntityNode {
             let children: TokenStream = if child_nodes.len() > 0 {
                 quote! {
                     .with_children(|builder| {
-                        #(#child_nodes),*
+                        #(#child_nodes;)*
                     })
                 }
             } else {
