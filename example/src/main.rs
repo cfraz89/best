@@ -1,10 +1,10 @@
-#![recursion_limit = "512"]
-
 use axum::{body::Body, response::IntoResponse, routing::get, Router};
-use bevy::prelude::*;
-use demo_index::init_page;
-use elementary::html::{plugin::RenderHtmlPlugin, stream::AppHtmlStream};
+use hevy::html::{plugin::RenderHtmlPlugin, stream::AppHtmlStream};
 use tower_http::services::ServeDir;
+
+use bevy::prelude::*;
+use hevy::html::*;
+use hevy::prelude::*;
 
 #[tokio::main]
 async fn main() {
@@ -28,4 +28,14 @@ async fn root() -> impl IntoResponse {
     app.add_plugins(RenderHtmlPlugin);
     app.add_systems(Startup, init_page);
     Body::from_stream(AppHtmlStream::new(app))
+}
+
+pub fn init_page(mut commands: Commands) {
+    ecn!(commands,
+    <Div Page> {
+        "Hello"
+        <Div StyleAttr(hash_map! {"color" => "red"})> {
+            "Yolo"
+        }
+    });
 }

@@ -1,5 +1,5 @@
 [workspace]
-members = ["demo", "demo-index", "elementary", "elementary-macros"]
+members = ["example", "hevy", "hevy-macros"]
 resolver = "2"
 
 [profile.release]

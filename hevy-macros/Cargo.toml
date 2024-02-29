@@ -1,5 +1,5 @@
 [package]
-name = "elementary-macros"
+name = "hevy-macros"
 version = "0.1.0"
 edition = "2021"
 

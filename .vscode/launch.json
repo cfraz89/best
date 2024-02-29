@@ -9,11 +9,7 @@
       "request": "launch",
       "name": "Debug executable 'demo'",
       "cargo": {
-        "args": [
-          "build",
-          "--bin=demo",
-          "--package=demo"
-        ],
+        "args": ["build", "--bin=demo", "--package=demo"],
         "filter": {
           "name": "demo",
           "kind": "bin"
@@ -27,12 +23,7 @@
       "request": "launch",
       "name": "Debug unit tests in executable 'demo'",
       "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=demo",
-          "--package=demo"
-        ],
+        "args": ["test", "--no-run", "--bin=demo", "--package=demo"],
         "filter": {
           "name": "demo",
           "kind": "bin"
@@ -46,12 +37,7 @@
       "request": "launch",
       "name": "Debug unit tests in library 'demo-index'",
       "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--lib",
-          "--package=demo-index"
-        ],
+        "args": ["test", "--no-run", "--lib", "--package=demo-index"],
         "filter": {
           "name": "demo-index",
           "kind": "lib"
@@ -63,16 +49,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'elementary-rs-lib'",
+      "name": "Debug unit tests in library 'hevy-rs-lib'",
       "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--lib",
-          "--package=elementary-rs-lib"
-        ],
+        "args": ["test", "--no-run", "--lib", "--package=hevy-rs-lib"],
         "filter": {
-          "name": "elementary-rs-lib",
+          "name": "hevy-rs-lib",
           "kind": "lib"
         }
       },

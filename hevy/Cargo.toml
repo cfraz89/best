@@ -1,5 +1,5 @@
 [package]
-name = "elementary"
+name = "hevy"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,4 +11,4 @@ bevy = { version = "0.13.0", default-features = false }
 either = "1.10.0"
 thiserror = "1.0.57"
 map-macro = "0.3.0"
-elementary-macros = { path = "../elementary-macros" }
+hevy-macros = { path = "../hevy-macros" }

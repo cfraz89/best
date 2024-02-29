@@ -1,4 +1,4 @@
-# Elementary-rs
+# hevy-rs
 
 A work in progress web framework for rust.
 
