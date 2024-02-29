@@ -2,7 +2,7 @@ use either::Either;
 
 use crate::text::Text;
 
-use super::{async_wait::AsyncWait, attributes::Attributes, tag::Tag};
+use super::{async_wait::AsyncWait, attributes::RenderAttributes, tag::Tag};
 use bevy::prelude::*;
 use std::fmt::Write;
 
@@ -27,7 +27,7 @@ static NO_SELF_CLOSE_TAGS: [&str; 3] = ["script", "style", "template"];
 ///Render a node instance, will be partial if component templates don't exist yet
 pub(crate) fn render_tag(
     tag: &Tag,
-    attributes: Option<&Attributes>,
+    attributes: &RenderAttributes,
     children: Option<&Children>,
     async_wait: Option<&AsyncWait>,
 ) -> Result<RenderTag, std::fmt::Error> {
@@ -35,15 +35,12 @@ pub(crate) fn render_tag(
         return Ok(RenderTag::Waiting);
     }
     let mut open = String::new();
-    let attributes_string = match attributes {
-        None => String::new(),
-        Some(attributes) => attributes
-            .0
-            .iter()
-            .map(|(k, v)| format!(" {}=\"{}\"", k, v))
-            .collect::<Vec<String>>()
-            .join(" "),
-    };
+    let attributes_string = attributes
+        .0
+        .iter()
+        .map(|(k, v)| format!(" {}=\"{}\"", k, v))
+        .collect::<Vec<String>>()
+        .join(" ");
     write!(open, "<{}{}", tag.0, attributes_string)?;
     // Some tags don't like self_closing
     if !children.is_some_and(|c| c.len() > 0) && !NO_SELF_CLOSE_TAGS.contains(&tag.0) {
@@ -66,7 +63,7 @@ pub(crate) fn add_render_tags(
         (
             Entity,
             &Tag,
-            Option<&Attributes>,
+            &RenderAttributes,
             Option<&Children>,
             Option<&AsyncWait>,
         ),
@@ -90,6 +87,8 @@ pub(crate) fn add_render_tags_for_text(
         commands
             .entity(entity)
             .insert(RenderTag::Text(text.0.clone()));
+
+        dbg!("Added render tag to entity", entity);
     }
 }
 
@@ -98,6 +97,7 @@ pub(crate) fn render_entity_tags(
     world: &mut World,
     entity: Entity,
 ) -> Result<Either<String, String>, std::fmt::Error> {
+    dbg!("Looking for render tag on", entity);
     let render_tag: RenderTag = { world.get::<RenderTag>(entity).unwrap().clone() };
     match render_tag {
         RenderTag::Consumed => Ok(Either::Right("".to_string())),

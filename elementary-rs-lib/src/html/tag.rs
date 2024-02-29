@@ -19,7 +19,7 @@ pub struct Tag(pub &'static str);
 /// All the shorthand components use this system to add the Tag component
 pub fn make_tag<T: Into<Tag> + Component + Copy>(
     mut commands: Commands,
-    query: Query<(Entity, &T)>,
+    query: Query<(Entity, &T), Without<Tag>>,
 ) {
     for (entity, t) in query.iter() {
         let tag: Tag = (*t).into();

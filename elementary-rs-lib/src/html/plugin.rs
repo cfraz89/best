@@ -1,5 +1,9 @@
-use crate::html::render::{
-    add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput,
+use crate::html::{
+    attributes::{add_attributes_to_render_attributes, reset_render_attributes},
+    render::{
+        self, add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput,
+    },
+    style::apply_styles,
 };
 
 use super::tag::{Main, Time, *};
@@ -10,6 +14,7 @@ use either::Either;
 enum HtmlRenderSet {
     ApplyTags,
     ApplyAttributes,
+    AddTags,
     RenderTags,
 }
 
@@ -45,12 +50,29 @@ impl Plugin for RenderHtmlPlugin {
             (Link, Title, Base, Head, Html, Body)
         );
         app.add_systems(
+            Update,
+            reset_render_attributes.after(HtmlRenderSet::ApplyTags),
+        );
+        app.add_systems(
             PostUpdate,
-            (
-                (add_render_tags, add_render_tags_for_text).before(render_tags_to_output),
-                render_tags_to_output,
-            )
-                .in_set(HtmlRenderSet::RenderTags),
+            (add_attributes_to_render_attributes).in_set(HtmlRenderSet::ApplyAttributes),
+        );
+        app.add_systems(
+            PostUpdate,
+            (apply_styles).in_set(HtmlRenderSet::ApplyAttributes),
+        );
+        app.add_systems(
+            PostUpdate,
+            (add_render_tags, add_render_tags_for_text)
+                .in_set(HtmlRenderSet::AddTags)
+                .after(HtmlRenderSet::ApplyAttributes),
+        );
+        app.add_systems(
+            PostUpdate,
+            render_tags_to_output
+                .in_set(HtmlRenderSet::RenderTags)
+                .after(HtmlRenderSet::AddTags)
+                .after(HtmlRenderSet::ApplyAttributes),
         );
         app.insert_resource(RenderOutput(Either::Left(String::new())));
     }
