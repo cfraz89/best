@@ -14,7 +14,7 @@ macro_rules! make_tag {
 }
 
 #[derive(Component)]
-pub struct Tag(&'static str);
+pub struct Tag(pub &'static str);
 
 /// All the shorthand components use this system to add the Tag component
 pub fn make_tag<T: Into<Tag> + Component + Copy>(

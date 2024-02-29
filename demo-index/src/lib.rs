@@ -1,64 +1,41 @@
 // mod my_h1;
 
 use bevy::prelude::*;
-use bevy_ecs::system::EntityCommands;
-use elementary_rs_lib::components::{BuildWebComponent, Page, WebComponent};
-use elementary_rs_lib::node::NodeRef;
-use elementary_rs_macros::{view, BuildComponent};
-use serde::{Deserialize, Serialize};
+use elementary_rs_lib::html::{
+    render::Page,
+    tag::{Div, H1},
+};
+use elementary_rs_lib::text::Text;
 
-//Called to setup the page
-pub fn setup_page(world: &mut World) {
-    let page = Index { x: 20 }.build_entity(world, vec![]);
-    world.entity_mut(page).insert(Page);
+pub fn init_page(commands: Commands) {
+    make_page_entities(commands);
 }
 
-#[derive(Component, BuildComponent, Clone, Serialize, Deserialize)]
-#[page(js_path = "./wasm/demo_index.js")]
-pub struct Index {
-    pub x: i32,
-}
-
-impl WebComponent for Index {
-    async fn template(self, world: &mut World) -> NodeRef {
-        view!(world,
-            <Div> {
-                <If(true)> {
-                    <MyH1 Title("Hello")> {
-                        <Text("World")>
-                    }
-                    <Div> {
-                        <Text("Hello")>
-                    }
-                }
-                <Else> {
-                    Text("Blah")
-                }
-                <SomeComponent>
-            })
-        }
-        //     <div>
-        //         <MyH1 title="Hello">
-        //             <slot />
-        //         </MyH1>
-        //         {self.x * 10}
-        //     </div>
-        // )
-    }
-}
-
-#[derive(Component, BuildComponent, Debug, Clone)]
-pub struct MyH1 {
-    pub title: String,
-}
-
-impl WebComponent for MyH1 {
-    async fn template(self, world: &mut World) -> NodeRef {
-        view!(world,
-            <div>
-                <h1 style="color: red;">{self.title}</h1>
-                <slot />
-            </div>
-        )
-    }
+pub fn make_page_entities(mut commands: Commands) -> Entity {
+    // entity!(world,
+    // <Div> {
+    //     <If(true)> {
+    //         <MyH1 Title("Hello")> {
+    //             <Text("World")>
+    //         }
+    //         <Div> {
+    //             <Text("Hello")>
+    //         }
+    //     }
+    //     <Else> {
+    //         Text("Blah")
+    //     }
+    //     <SomeComponent>
+    // })
+    commands
+        .spawn((Page, Div))
+        .with_children(|builder| {
+            builder.spawn(H1).with_children(|builder| {
+                builder.spawn(Text("World".to_string()));
+            });
+            builder.spawn(Div).with_children(|builder| {
+                builder.spawn(Text("Hello".to_string()));
+            });
+        })
+        .id()
 }

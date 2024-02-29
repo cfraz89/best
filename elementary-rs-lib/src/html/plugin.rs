@@ -1,12 +1,16 @@
+use crate::html::render::{
+    add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput,
+};
+
 use super::tag::{Main, Time, *};
 use bevy::prelude::*;
-
-struct RenderHtmlPlugin {}
+use either::Either;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone, SystemSet)]
 enum HtmlRenderSet {
     ApplyTags,
     ApplyAttributes,
+    RenderTags,
 }
 
 macro_rules! add_tag_systems {
@@ -18,6 +22,8 @@ macro_rules! add_tag_systems {
       $app.add_systems(Update, ($(make_tag::<$tag>),*).in_set(HtmlRenderSet::ApplyTags));
     };
 }
+
+pub struct RenderHtmlPlugin;
 impl Plugin for RenderHtmlPlugin {
     fn build(&self, app: &mut App) {
         add_tag_systems!(
@@ -38,5 +44,14 @@ impl Plugin for RenderHtmlPlugin {
             (Dfn, Time, Progress, Meter, Br, Wbr, Template, Slot, Script, Noscript, Style, Meta),
             (Link, Title, Base, Head, Html, Body)
         );
+        app.add_systems(
+            PostUpdate,
+            (
+                (add_render_tags, add_render_tags_for_text).before(render_tags_to_output),
+                render_tags_to_output,
+            )
+                .in_set(HtmlRenderSet::RenderTags),
+        );
+        app.insert_resource(RenderOutput(Either::Left(String::new())));
     }
 }

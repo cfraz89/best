@@ -1,16 +1,10 @@
 #![recursion_limit = "512"]
 
-use axum::{
-    body::Body,
-    response::{Html, IntoResponse},
-    routing::get,
-    Router,
-};
-use bevy::{prelude::*, tasks::futures_lite::stream};
-// use demo_index::setup_page;
-use elementary_rs_lib::{components::Page, html_render::render_component_instance, signal::Signal};
+use axum::{body::Body, response::IntoResponse, routing::get, Router};
+use bevy::prelude::*;
+use demo_index::init_page;
+use elementary_rs_lib::html::{plugin::RenderHtmlPlugin, stream::AppHtmlStream};
 use tower_http::services::ServeDir;
-use wasm_bindgen::prelude::*;
 
 #[tokio::main]
 async fn main() {
@@ -31,21 +25,7 @@ async fn main() {
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
     let mut app = App::new();
-    app.add_plugins(render_html_plugin);
-    // let mut app = App::new();
-    // app.add_systems(Startup, setup_page).update();
-    // let page = app
-    //     .world
-    //     .query_filtered::<Entity, With<Page>>()
-    //     .get_single(&app.world)
-    //     .unwrap();
-    // let response =
-    //     render_component_instance(&app.world, page).expect("Couldn't generate a response");
-    // Html(response.to_string())
-    Body::from_stream(stream::poll_fn(f))
-}
-
-#[wasm_bindgen(start)]
-async fn start() -> Result<(), JsValue> {
-    elementary_rs_lib::init::elementary_init()
+    app.add_plugins(RenderHtmlPlugin);
+    app.add_systems(Startup, init_page);
+    Body::from_stream(AppHtmlStream::new(app))
 }
