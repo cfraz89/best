@@ -96,17 +96,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-recursion"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fd55a5ba1179988837d24ab4c7cc8ed6efdeff578ede0416b4225a5fca35bd0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "async-task"
 version = "4.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -678,31 +667,19 @@ dependencies = [
  "demo-index",
  "elementary-rs-lib",
  "elementary-rs-macros",
- "proc-macro2",
- "quote",
  "serde",
  "tokio",
  "tower-http",
  "tracing-subscriber",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
 name = "demo-index"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "bevy",
- "bevy_ecs",
- "cfg-if",
  "elementary-rs-lib",
  "elementary-rs-macros",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
@@ -721,22 +698,11 @@ checksum = "11157ac094ffbdde99aa67b23417ebdd801842852b500e395a45a9c0aac03e4a"
 name = "elementary-rs-lib"
 version = "0.1.0"
 dependencies = [
- "async-recursion",
- "async-trait",
  "bevy",
  "bevy_ecs",
- "cfg-if",
- "console_error_panic_hook",
  "either",
- "getrandom",
- "gloo-utils",
- "nanoid",
- "serde",
- "serde_json",
  "thiserror",
  "uuid",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -921,19 +887,6 @@ checksum = "151665d9be52f9bb40fc7966565d39666f2d1e69233571b71b87791c7e0528b3"
 dependencies = [
  "bytemuck",
  "serde",
-]
-
-[[package]]
-name = "gloo-utils"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b5555354113b18c547c1d3a98fbf7fb32a9ff4f6fa112ce823a21641a0ba3aa"
-dependencies = [
- "js-sys",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -1181,15 +1134,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys",
-]
-
-[[package]]
-name = "nanoid"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
-dependencies = [
- "rand",
 ]
 
 [[package]]

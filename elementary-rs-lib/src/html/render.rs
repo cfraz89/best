@@ -86,9 +86,7 @@ pub(crate) fn add_render_tags_for_text(
     for (entity, text) in &query {
         commands
             .entity(entity)
-            .insert(RenderTag::Text(text.0.clone()));
-
-        dbg!("Added render tag to entity", entity);
+            .insert(RenderTag::Text(text.0.to_string()));
     }
 }
 
@@ -97,7 +95,6 @@ pub(crate) fn render_entity_tags(
     world: &mut World,
     entity: Entity,
 ) -> Result<Either<String, String>, std::fmt::Error> {
-    dbg!("Looking for render tag on", entity);
     let render_tag: RenderTag = { world.get::<RenderTag>(entity).unwrap().clone() };
     match render_tag {
         RenderTag::Consumed => Ok(Either::Right("".to_string())),

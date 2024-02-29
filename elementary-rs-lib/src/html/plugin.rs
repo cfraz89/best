@@ -1,8 +1,6 @@
 use crate::html::{
     attributes::{add_attributes_to_render_attributes, reset_render_attributes},
-    render::{
-        self, add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput,
-    },
+    render::{add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput},
     style::apply_styles,
 };
 
