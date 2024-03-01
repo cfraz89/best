@@ -28,7 +28,7 @@ async fn root() -> impl IntoResponse {
 }
 
 pub fn init_page(mut commands: Commands) {
-    ecn!(commands,
+    hevy!(commands,
         <Div Page> {
             "Hello"
             <Div Styles(hash_map! {"color" => "red"})> {

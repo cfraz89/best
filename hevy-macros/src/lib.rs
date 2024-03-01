@@ -1,11 +1,11 @@
 #![feature(proc_macro_span)]
 #![feature(proc_macro_diagnostic)]
-mod ecn;
 mod entity_node;
+mod hevy;
 
 use proc_macro::TokenStream;
 
 #[proc_macro]
-pub fn ecn(input: TokenStream) -> TokenStream {
-    ecn::ecn(input.into()).into()
+pub fn hevy(input: TokenStream) -> TokenStream {
+    hevy::hevy(input.into()).into()
 }
