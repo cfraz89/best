@@ -1,8 +1,8 @@
 use either::Either;
 
-use crate::text::Text;
+use crate::{r#async::AsyncTasks, text::Text};
 
-use super::{async_wait::AsyncWait, attributes::RenderAttributes, tag::Tag};
+use super::{attributes::RenderAttributes, tag::Tag};
 use bevy::prelude::*;
 use std::fmt::Write;
 
@@ -26,12 +26,13 @@ static NO_SELF_CLOSE_TAGS: [&str; 3] = ["script", "style", "template"];
 
 ///Render a node instance, will be partial if component templates don't exist yet
 pub(crate) fn render_tag(
+    entity: Entity,
     tag: &Tag,
     attributes: &RenderAttributes,
     children: Option<&Children>,
-    async_wait: Option<&AsyncWait>,
+    async_tasks: &Res<AsyncTasks>,
 ) -> Result<RenderTag, std::fmt::Error> {
-    if async_wait.is_some_and(|s| s.0 > 0) {
+    if async_tasks.map.get(&entity).is_some_and(|s| s.len() > 0) {
         return Ok(RenderTag::Waiting);
     }
     let mut open = String::new();
@@ -59,20 +60,13 @@ pub(crate) fn render_tag(
 //Without<RenderTag> is important to ensure we don't reset tags that are already rendered/streamed
 pub(crate) fn add_render_tags(
     mut commands: Commands,
-    query: Query<
-        (
-            Entity,
-            &Tag,
-            &RenderAttributes,
-            Option<&Children>,
-            Option<&AsyncWait>,
-        ),
-        Without<RenderTag>,
-    >,
+    query: Query<(Entity, &Tag, &RenderAttributes, Option<&Children>), Without<RenderTag>>,
+    async_tasks: Res<AsyncTasks>,
 ) {
-    for (entity, tag, attributes, children, async_wait) in &query {
+    for (entity, tag, attributes, children) in &query {
         commands.entity(entity).insert(
-            render_tag(tag, attributes, children, async_wait).expect("Error rendering tag"),
+            render_tag(entity, tag, attributes, children, &async_tasks)
+                .expect("Error rendering tag"),
         );
     }
 }
@@ -98,7 +92,15 @@ pub(crate) fn render_entity_tags(
     let render_tag: RenderTag = { world.get::<RenderTag>(entity).unwrap().clone() };
     match render_tag {
         RenderTag::Consumed => Ok(Either::Right("".to_string())),
-        RenderTag::OpenConsumed { close } => Ok(Either::Right(close.to_string())),
+        RenderTag::OpenConsumed { close } => match render_children(entity, world)? {
+            Either::Left(partial) => Ok(Either::Left(partial)),
+            Either::Right(s) => {
+                let mut output = s;
+                world.entity_mut(entity).insert(RenderTag::Consumed);
+                write!(output, "{}", close)?;
+                Ok(Either::Right(output))
+            }
+        },
         RenderTag::Waiting => Ok(Either::Left("".to_string())),
         RenderTag::SelfClosing(s) => {
             world.entity_mut(entity).insert(RenderTag::Consumed);
@@ -110,30 +112,47 @@ pub(crate) fn render_entity_tags(
         }
         RenderTag::OpenClose { open, close } => {
             let mut output = open;
-            let children: Option<Vec<Entity>> = {
-                world
-                    .get::<Children>(entity)
-                    .map(|c| c.iter().map(|e| e.to_owned()).collect::<Vec<_>>())
-            };
-            if let Some(children) = children {
-                world.entity_mut(entity).insert(RenderTag::OpenConsumed {
-                    close: close.to_string(),
-                });
-                for child in children.into_iter() {
-                    match render_entity_tags(world, child)? {
-                        Either::Left(partial) => {
-                            output.write_str(&partial)?;
-                            return Ok(Either::Left(output.to_string()));
-                        }
-                        Either::Right(s) => output.push_str(&s),
-                    }
+            match render_children(entity, world)? {
+                Either::Left(partial) => {
+                    output.write_str(&partial)?;
+                    world
+                        .entity_mut(entity)
+                        .insert(RenderTag::OpenConsumed { close });
+                    Ok(Either::Left(output))
+                }
+                Either::Right(s) => {
+                    output.push_str(&s);
+                    world.entity_mut(entity).insert(RenderTag::Consumed);
+                    write!(output, "{}", close)?;
+                    Ok(Either::Right(output))
                 }
             }
-            world.entity_mut(entity).insert(RenderTag::Consumed);
-            write!(output, "{}", close)?;
-            Ok(Either::Right(output.to_string()))
         }
     }
+}
+
+fn render_children(
+    entity: Entity,
+    world: &mut World,
+) -> Result<Either<String, String>, std::fmt::Error> {
+    let mut output = String::new();
+    let children: Option<Vec<Entity>> = {
+        world
+            .get::<Children>(entity)
+            .map(|c| c.iter().map(|e| e.to_owned()).collect::<Vec<_>>())
+    };
+    if let Some(children) = children {
+        for child in children.into_iter() {
+            match render_entity_tags(world, child)? {
+                Either::Left(partial) => {
+                    output.write_str(&partial)?;
+                    return Ok(Either::Left(output.to_string()));
+                }
+                Either::Right(s) => output.push_str(&s),
+            }
+        }
+    }
+    Ok(Either::Right(output))
 }
 
 //System to consume our tags into output resource

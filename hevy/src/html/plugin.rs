@@ -1,7 +1,12 @@
-use crate::html::{
-    attributes::{add_attributes_to_render_attributes, reset_render_attributes},
-    render::{add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput},
-    styles::apply_styles,
+use std::{collections::HashMap, rc::Rc, sync::mpsc};
+
+use crate::{
+    html::{
+        attributes::{add_attributes_to_render_attributes, reset_render_attributes},
+        render::{add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput},
+        styles::apply_styles,
+    },
+    r#async::{process_async_callbacks, update_tasks, AsyncContext, AsyncReceivers, AsyncTasks},
 };
 
 use super::tag::{Main, Time, *};
@@ -47,24 +52,35 @@ impl Plugin for RenderHtmlPlugin {
             (Dfn, Time, Progress, Meter, Br, Wbr, Template, Slot, Script, Noscript, Style, Meta),
             (Link, Title, Base, Head, Html, Body)
         );
+        // Reset our render attribute components
         app.add_systems(
             Update,
             reset_render_attributes.after(HtmlRenderSet::ApplyTags),
         );
+        // Update async tasks
+        app.add_systems(Update, update_tasks);
+
+        // Apply attributes to render attributes
         app.add_systems(
             PostUpdate,
             (add_attributes_to_render_attributes).in_set(HtmlRenderSet::ApplyAttributes),
         );
+
+        // Apply styles to render attributes
         app.add_systems(
             PostUpdate,
             (apply_styles).in_set(HtmlRenderSet::ApplyAttributes),
         );
+
+        // Render out our tags to render tags
         app.add_systems(
             PostUpdate,
             (add_render_tags, add_render_tags_for_text)
                 .in_set(HtmlRenderSet::AddTags)
                 .after(HtmlRenderSet::ApplyAttributes),
         );
+
+        // Walk render tags from page down and write to output
         app.add_systems(
             PostUpdate,
             render_tags_to_output
@@ -72,6 +88,19 @@ impl Plugin for RenderHtmlPlugin {
                 .after(HtmlRenderSet::AddTags)
                 .after(HtmlRenderSet::ApplyAttributes),
         );
+        app.add_systems(Update, process_async_callbacks);
+        let (world_callback_tx, world_callback_rx) = mpsc::channel();
+        let (commands_callback_tx, commands_callback_rx) = mpsc::channel();
+        app.insert_resource(AsyncTasks {
+            map: HashMap::new(),
+            world_callback_tx,
+            commands_callback_tx,
+        });
         app.insert_resource(RenderOutput(Either::Left(String::new())));
+        app.insert_non_send_resource(Rc::new(AsyncReceivers {
+            world_callback_rx,
+            commands_callback_rx,
+        }));
+        app.insert_non_send_resource(AsyncContext::new());
     }
 }

@@ -13,3 +13,4 @@ thiserror = "1.0.57"
 map-macro = "0.3.0"
 hevy-macros = { path = "../hevy-macros" }
 axum-core = "0.4.3"
+futures = "0.3.30"

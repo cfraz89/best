@@ -1,5 +1,7 @@
+#![feature(async_closure)]
 use axum::{response::IntoResponse, routing::get, Router};
 use hevy::axum_html::AxumHtmlApp;
+use hevy::r#async::AsyncCallbacks;
 use tower_http::services::ServeDir;
 
 use bevy::prelude::*;
@@ -24,7 +26,7 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    AxumHtmlApp::new(init_page)
+    AxumHtmlApp::new((init_page, replace_yolo).chain())
 }
 
 pub fn init_page(mut commands: Commands) {
@@ -36,4 +38,15 @@ pub fn init_page(mut commands: Commands) {
             }
         }
     );
+}
+
+fn replace_yolo(query: Query<Entity, With<Styles>>, mut async_tasks: ResMut<AsyncTasks>) {
+    for entity in &query {
+        async_tasks.run(entity, async move |cbs: AsyncCallbacks| {
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+            cbs.with_commands(move |commands| {
+                set_child(commands, entity, TextString("Not yolo".to_string()));
+            });
+        });
+    }
 }
