@@ -28,7 +28,7 @@ impl ToTokens for EntityNode {
             }
             .into();
             tokens.extend(quote! {
-                #builder_identifier.spawn((#components))#children;
+                #builder_identifier.spawn((#components))#children
             })
         }
     }

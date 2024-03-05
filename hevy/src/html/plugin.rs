@@ -11,7 +11,7 @@ use crate::{
         render::{add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput},
         styles::apply_styles,
     },
-    r#async::{AsyncContext, AsyncReceivers, AsyncTasks},
+    r#async::{process_async_callbacks, AsyncContext, AsyncReceivers, AsyncTasks},
 };
 
 use super::tag::{Main, Time, *};
@@ -91,6 +91,8 @@ impl Plugin for RenderHtmlPlugin {
                 .after(HtmlRenderSet::AddTags)
                 .after(HtmlRenderSet::ApplyAttributes),
         );
+        app.add_systems(Update, process_async_callbacks);
+
         let (world_callback_tx, world_callback_rx) = mpsc::channel(100);
         let (commands_callback_tx, commands_callback_rx) = mpsc::channel(100);
         app.insert_resource(AsyncTasks {

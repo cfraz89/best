@@ -17,7 +17,7 @@ pub struct AsyncTasks {
     pub(crate) map:
         HashMap<Entity, HashMap<usize, Pin<Box<dyn Future<Output = ()> + Sync + Send + 'static>>>>,
     pub(crate) world_callback_tx: Sender<Box<dyn Fn(&mut World) -> () + Send + Sync>>,
-    pub(crate) commands_callback_tx: Sender<Box<dyn Fn(Commands) -> () + Send + Sync>>,
+    pub(crate) commands_callback_tx: Sender<Box<dyn Fn(&mut Commands) -> () + Send + Sync>>,
 }
 
 impl AsyncTasks {
@@ -37,14 +37,14 @@ impl AsyncTasks {
 
 pub struct AsyncCallbacks {
     world_tx: Sender<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>,
-    commands_tx: Sender<Box<dyn Fn(Commands) -> () + Send + Sync + 'static>>,
+    commands_tx: Sender<Box<dyn Fn(&mut Commands) -> () + Send + Sync + 'static>>,
 }
 
 impl AsyncCallbacks {
     pub async fn with_world(&self, cb: impl Fn(&mut World) -> () + Send + Sync + 'static) {
         self.world_tx.send(Box::new(cb)).await.unwrap();
     }
-    pub async fn with_commands(&self, cb: impl Fn(Commands) -> () + Send + Sync + 'static) {
+    pub async fn with_commands(&self, cb: impl Fn(&mut Commands) -> () + Send + Sync + 'static) {
         self.commands_tx.send(Box::new(cb)).await.unwrap();
     }
 }
@@ -103,7 +103,6 @@ pub fn update_tasks(world: &mut World, context: &mut Context<'_>) {
             _ => {}
         }
     }
-    process_async_callbacks(world, context)
 }
 
 #[derive(Resource)]
@@ -111,10 +110,10 @@ pub(crate) struct AsyncReceivers {
     pub(crate) world_callback_rx:
         Arc<RwLock<Receiver<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>>>,
     pub(crate) commands_callback_rx:
-        Arc<RwLock<Receiver<Box<dyn Fn(Commands) -> () + Send + Sync + 'static>>>>,
+        Arc<RwLock<Receiver<Box<dyn Fn(&mut Commands) -> () + Send + Sync + 'static>>>>,
 }
 
-fn process_async_callbacks(world: &mut World, context: &mut Context<'_>) {
+pub(crate) fn process_async_callbacks(world: &mut World) {
     let world_callback_rx = {
         world
             .resource_mut::<AsyncReceivers>()
@@ -133,9 +132,8 @@ fn process_async_callbacks(world: &mut World, context: &mut Context<'_>) {
             .clone()
     };
     while let Ok(cb) = commands_callback_rx.write().unwrap().try_recv() {
-        let commands = Commands::new(&mut command_queue, world);
-        cb(commands);
+        let mut commands = Commands::new(&mut command_queue, world);
+        cb(&mut commands);
     }
     command_queue.apply(world);
-    // context.waker().wake_by_ref();
 }

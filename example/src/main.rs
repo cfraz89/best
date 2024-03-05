@@ -36,16 +36,26 @@ pub fn init_page(mut commands: Commands) {
             <Div Styles(hash_map! {"color" => "red"})> {
                 "Yolo"
             }
+            <Div NotYolo>
         }
     );
 }
 
-fn replace_yolo(query: Query<Entity, With<Styles>>, mut async_tasks: ResMut<AsyncTasks>) {
+#[derive(Component)]
+struct NotYolo;
+
+fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<AsyncTasks>) {
     for entity in &query {
         async_tasks.run(entity, async move |cbs: AsyncCallbacks| {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             cbs.with_commands(move |commands| {
-                set_child(commands, entity, Text("Not yolo".to_string()));
+                let ent = hevy!(commands,<H1>{"Not yolo"}).id();
+                commands.entity(entity).add_child(ent);
+                // set_child(
+                //     commands,
+                //     entity,
+                //     Text("Not yolo".to_string()),
+                // );
             })
             .await;
         });
