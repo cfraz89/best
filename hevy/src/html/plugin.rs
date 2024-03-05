@@ -1,4 +1,9 @@
-use std::{collections::HashMap, rc::Rc, sync::mpsc};
+use std::{
+    collections::HashMap,
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
+use tokio::sync::mpsc;
 
 use crate::{
     html::{
@@ -6,7 +11,7 @@ use crate::{
         render::{add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput},
         styles::apply_styles,
     },
-    r#async::{process_async_callbacks, update_tasks, AsyncContext, AsyncReceivers, AsyncTasks},
+    r#async::{AsyncContext, AsyncReceivers, AsyncTasks},
 };
 
 use super::tag::{Main, Time, *};
@@ -57,8 +62,6 @@ impl Plugin for RenderHtmlPlugin {
             Update,
             reset_render_attributes.after(HtmlRenderSet::ApplyTags),
         );
-        // Update async tasks
-        app.add_systems(Update, update_tasks);
 
         // Apply attributes to render attributes
         app.add_systems(
@@ -88,19 +91,17 @@ impl Plugin for RenderHtmlPlugin {
                 .after(HtmlRenderSet::AddTags)
                 .after(HtmlRenderSet::ApplyAttributes),
         );
-        app.add_systems(Update, process_async_callbacks);
-        let (world_callback_tx, world_callback_rx) = mpsc::channel();
-        let (commands_callback_tx, commands_callback_rx) = mpsc::channel();
+        let (world_callback_tx, world_callback_rx) = mpsc::channel(100);
+        let (commands_callback_tx, commands_callback_rx) = mpsc::channel(100);
         app.insert_resource(AsyncTasks {
             map: HashMap::new(),
             world_callback_tx,
             commands_callback_tx,
         });
         app.insert_resource(RenderOutput(Either::Left(String::new())));
-        app.insert_non_send_resource(Rc::new(AsyncReceivers {
-            world_callback_rx,
-            commands_callback_rx,
-        }));
-        app.insert_non_send_resource(AsyncContext::new());
+        app.insert_resource(AsyncReceivers {
+            world_callback_rx: Arc::new(RwLock::new(world_callback_rx)),
+            commands_callback_rx: Arc::new(RwLock::new(commands_callback_rx)),
+        });
     }
 }

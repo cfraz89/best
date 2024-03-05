@@ -8,8 +8,9 @@ use std::mem::transmute;
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll::Ready};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(Resource)]
 pub struct AsyncTasks {
@@ -40,11 +41,11 @@ pub struct AsyncCallbacks {
 }
 
 impl AsyncCallbacks {
-    pub fn with_world(&self, cb: impl Fn(&mut World) -> () + Send + Sync + 'static) {
-        self.world_tx.send(Box::new(cb)).unwrap();
+    pub async fn with_world(&self, cb: impl Fn(&mut World) -> () + Send + Sync + 'static) {
+        self.world_tx.send(Box::new(cb)).await.unwrap();
     }
-    pub fn with_commands(&self, cb: impl Fn(Commands) -> () + Send + Sync + 'static) {
-        self.commands_tx.send(Box::new(cb)).unwrap();
+    pub async fn with_commands(&self, cb: impl Fn(Commands) -> () + Send + Sync + 'static) {
+        self.commands_tx.send(Box::new(cb)).await.unwrap();
     }
 }
 
@@ -79,56 +80,62 @@ impl AsyncContext {
     }
 }
 
-pub fn update_tasks(mut async_tasks: ResMut<AsyncTasks>, mut context: NonSendMut<AsyncContext>) {
-    match context.0.get_mut() {
-        Option::None => {}
-        Option::Some(context) => {
-            let mut completed_entities = Vec::<Entity>::new();
-            for (entity, hm) in async_tasks.map.iter_mut() {
-                let mut completed_ids = Vec::<usize>::new();
-                for (id, action) in hm.iter_mut() {
-                    if let Ready(_) = action.poll(context.deref_mut()) {
-                        completed_entities.push(*entity);
-                        completed_ids.push(*id);
-                    }
-                }
-                for id in completed_ids {
-                    hm.remove(&id);
-                }
-            }
-            for entity in completed_entities {
-                match async_tasks.map.get(&entity) {
-                    Some(hm) if hm.len() == 0 => {
-                        async_tasks.map.remove(&entity);
-                    }
-                    _ => {}
-                }
+pub fn update_tasks(world: &mut World, context: &mut Context<'_>) {
+    let mut async_tasks = world.resource_mut::<AsyncTasks>();
+    let mut completed_entities = Vec::<Entity>::new();
+    for (entity, hm) in async_tasks.map.iter_mut() {
+        let mut completed_ids = Vec::<usize>::new();
+        for (id, action) in hm.iter_mut() {
+            if let Ready(_) = action.poll(context) {
+                completed_entities.push(*entity);
+                completed_ids.push(*id);
             }
         }
-    };
+        for id in completed_ids {
+            hm.remove(&id);
+        }
+    }
+    for entity in completed_entities {
+        match async_tasks.map.get(&entity) {
+            Some(hm) if hm.len() == 0 => {
+                async_tasks.map.remove(&entity);
+            }
+            _ => {}
+        }
+    }
+    process_async_callbacks(world, context)
 }
 
+#[derive(Resource)]
 pub(crate) struct AsyncReceivers {
-    pub(crate) world_callback_rx: Receiver<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>,
-    pub(crate) commands_callback_rx: Receiver<Box<dyn Fn(Commands) -> () + Send + Sync + 'static>>,
+    pub(crate) world_callback_rx:
+        Arc<RwLock<Receiver<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>>>,
+    pub(crate) commands_callback_rx:
+        Arc<RwLock<Receiver<Box<dyn Fn(Commands) -> () + Send + Sync + 'static>>>>,
 }
 
-pub(crate) fn process_async_callbacks(world: &mut World) {
-    let receivers = world.non_send_resource::<Rc<AsyncReceivers>>().clone();
-    while let Ok(cb) = receivers.world_callback_rx.try_recv() {
+fn process_async_callbacks(world: &mut World, context: &mut Context<'_>) {
+    let world_callback_rx = {
+        world
+            .resource_mut::<AsyncReceivers>()
+            .world_callback_rx
+            .clone()
+    };
+    while let Ok(cb) = world_callback_rx.write().unwrap().try_recv() {
         cb(world);
     }
+
     let mut command_queue = CommandQueue::default();
-    while let Ok(cb) = receivers.commands_callback_rx.try_recv() {
+    let commands_callback_rx = {
+        world
+            .resource_mut::<AsyncReceivers>()
+            .commands_callback_rx
+            .clone()
+    };
+    while let Ok(cb) = commands_callback_rx.write().unwrap().try_recv() {
         let commands = Commands::new(&mut command_queue, world);
         cb(commands);
     }
     command_queue.apply(world);
-    // let mut context = world.non_send_resource_mut::<AsyncContext>();
-    // match context.deref_mut() {
-    //     AsyncContext::Dropped => {}
-    //     AsyncContext::Context(context) => {
-    //         context.get_mut().waker().wake_by_ref();
-    //     }
-    // }
+    // context.waker().wake_by_ref();
 }

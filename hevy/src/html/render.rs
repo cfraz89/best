@@ -6,7 +6,7 @@ use super::{attributes::RenderAttributes, tag::Tag};
 use bevy::prelude::*;
 use std::fmt::Write;
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Debug)]
 pub(crate) enum RenderTag {
     Waiting,
     SelfClosing(String),
@@ -25,7 +25,7 @@ pub struct Page;
 static NO_SELF_CLOSE_TAGS: [&str; 3] = ["script", "style", "template"];
 
 ///Render a node instance, will be partial if component templates don't exist yet
-pub(crate) fn render_tag(
+pub(crate) fn get_render_tag(
     entity: Entity,
     tag: &Tag,
     attributes: &RenderAttributes,
@@ -57,17 +57,28 @@ pub(crate) fn render_tag(
 }
 
 //System to actually add the tags
-//Without<RenderTag> is important to ensure we don't reset tags that are already rendered/streamed
 pub(crate) fn add_render_tags(
     mut commands: Commands,
-    query: Query<(Entity, &Tag, &RenderAttributes, Option<&Children>), Without<RenderTag>>,
+    query: Query<(
+        Entity,
+        &Tag,
+        &RenderAttributes,
+        Option<&RenderTag>,
+        Option<&Children>,
+    )>,
     async_tasks: Res<AsyncTasks>,
 ) {
-    for (entity, tag, attributes, children) in &query {
-        commands.entity(entity).insert(
-            render_tag(entity, tag, attributes, children, &async_tasks)
-                .expect("Error rendering tag"),
-        );
+    for (entity, tag, attributes, render_tag, children) in &query {
+        match render_tag {
+            None | Some(RenderTag::Waiting) => {
+                dbg!("Adding render tag to entity", entity);
+                commands.entity(entity).insert(
+                    get_render_tag(entity, tag, attributes, children, &async_tasks)
+                        .expect("Error rendering tag"),
+                );
+            }
+            _ => continue,
+        }
     }
 }
 
@@ -75,12 +86,17 @@ pub(crate) fn add_render_tags(
 //Without<RenderTag> is important to ensure we don't reset render status of text that has been streamed
 pub(crate) fn add_render_tags_for_text(
     mut commands: Commands,
-    query: Query<(Entity, &Text), Without<RenderTag>>,
+    query: Query<(Entity, &Text, Option<&RenderTag>)>,
 ) {
-    for (entity, text) in &query {
-        commands
-            .entity(entity)
-            .insert(RenderTag::Text(text.0.to_string()));
+    for (entity, text, render_tag) in &query {
+        match render_tag {
+            None | Some(RenderTag::Waiting) => {
+                commands
+                    .entity(entity)
+                    .insert(RenderTag::Text(text.0.to_string()));
+            }
+            _ => continue,
+        }
     }
 }
 
@@ -89,7 +105,13 @@ pub(crate) fn render_entity_tags(
     world: &mut World,
     entity: Entity,
 ) -> Result<Either<String, String>, std::fmt::Error> {
-    let render_tag: RenderTag = { world.get::<RenderTag>(entity).unwrap().clone() };
+    let render_tag: RenderTag = {
+        world
+            .get::<RenderTag>(entity)
+            .expect("Entity should have a render tag by now")
+            .clone()
+    };
+    dbg!(entity, render_tag.clone());
     match render_tag {
         RenderTag::Consumed => Ok(Either::Right("".to_string())),
         RenderTag::OpenConsumed { close } => match render_children(entity, world)? {

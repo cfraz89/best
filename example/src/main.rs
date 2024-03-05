@@ -45,8 +45,9 @@ fn replace_yolo(query: Query<Entity, With<Styles>>, mut async_tasks: ResMut<Asyn
         async_tasks.run(entity, async move |cbs: AsyncCallbacks| {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             cbs.with_commands(move |commands| {
-                set_child(commands, entity, TextString("Not yolo".to_string()));
-            });
+                set_child(commands, entity, Text("Not yolo".to_string()));
+            })
+            .await;
         });
     }
 }

@@ -107,7 +107,7 @@ fn parse_entity(
             let lit: TokenStream = token?.into();
             Ok(Some(EntityNode {
                 builder_identifier,
-                components: quote!(Text(#lit)),
+                components: quote!(Text(#lit.to_string())),
                 child_nodes: Arc::new(vec![]),
             }))
         }
