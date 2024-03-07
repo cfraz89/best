@@ -15,15 +15,12 @@ use tokio::sync::mpsc::{Receiver, Sender};
 pub struct AsyncTasks {
     pub(crate) map:
         HashMap<Entity, HashMap<usize, Pin<Box<dyn Future<Output = ()> + Sync + Send + 'static>>>>,
-    pub(crate) world_callback_rx: Receiver<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>,
     pub(crate) world_callback_tx: Sender<Box<dyn Fn(&mut World) -> () + Send + Sync>>,
-    pub(crate) commands_callback_rx:
-        Receiver<Box<dyn Fn(&mut Commands) -> () + Send + Sync + 'static>>,
     pub(crate) commands_callback_tx: Sender<Box<dyn Fn(&mut Commands) -> () + Send + Sync>>,
 }
 
 impl AsyncTasks {
-    pub fn run<F: Future<Output = ()> + Send + Sync + 'static>(
+    pub fn run_async<F: Future<Output = ()> + Send + Sync + 'static>(
         &mut self,
         entity: Entity,
         future: impl FnOnce(AsyncCallbacks) -> F,
@@ -82,7 +79,8 @@ impl AsyncContext {
     }
 }
 
-pub fn update_tasks(mut async_tasks: ResMut<AsyncTasks>, waker: Res<AsyncWaker>) {
+/// Poll all async tasks stored against entities, and remove them if they are polled to completion
+pub(crate) fn update_tasks(mut async_tasks: ResMut<AsyncTasks>, waker: Res<AsyncWaker>) {
     match &waker.0 {
         None => {}
         Some(waker) => {
@@ -113,18 +111,22 @@ pub fn update_tasks(mut async_tasks: ResMut<AsyncTasks>, waker: Res<AsyncWaker>)
     }
 }
 
+#[derive(Resource)]
+pub(crate) struct AsyncRx {
+    pub(crate) world_callback_rx: Receiver<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>,
+    pub(crate) commands_callback_rx:
+        Receiver<Box<dyn Fn(&mut Commands) -> () + Send + Sync + 'static>>,
+}
+
+/// Run async with_world and with_commands callbacks
 pub(crate) fn process_async_callbacks(world: &mut World) {
-    while let Ok(cb) = world
-        .resource_mut::<AsyncTasks>()
-        .world_callback_rx
-        .try_recv()
-    {
+    while let Ok(cb) = world.resource_mut::<AsyncRx>().world_callback_rx.try_recv() {
         cb(world);
     }
 
     let mut command_queue = CommandQueue::default();
     while let Ok(cb) = world
-        .resource_mut::<AsyncTasks>()
+        .resource_mut::<AsyncRx>()
         .commands_callback_rx
         .try_recv()
     {

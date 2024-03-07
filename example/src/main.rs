@@ -46,7 +46,7 @@ struct NotYolo;
 
 fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<AsyncTasks>) {
     for entity in &query {
-        async_tasks.run(entity, async move |cbs: AsyncCallbacks| {
+        async_tasks.run_async(entity, async move |cbs: AsyncCallbacks| {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             cbs.with_commands(move |commands| {
                 let ent = hevy!(commands,<H1>{"Not yolo"}).id();
