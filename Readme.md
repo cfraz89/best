@@ -1,10 +1,4 @@
-# hevy-rs
+# best
+# Bevy Entity-compnent System for Templates
 
-A work in progress web framework for rust.
-
-Its goals are:
-- Adds a frontend to a standard rust backend application, eg a page can be served from a route in an axum app
-- Components rendered with server-side data
-- Use web components to simplify hydration?
-- Fine-grained (signal-based) reactivity
-- Svelte-like template syntax
+An experiment in defining an templating system for an entity tree, defining the components on each entity. This tree can be rendered to html, probably to native UI in bevy, and who knows what else

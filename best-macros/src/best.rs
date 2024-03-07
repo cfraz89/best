@@ -5,8 +5,8 @@ use quote::{quote, ToTokens, TokenStreamExt};
 
 use crate::entity_node::EntityNode;
 
-/// Parse a hevy notation macro template into a TemplateNode
-pub fn hevy(input: TokenStream) -> TokenStream {
+/// Parse a best notation macro template into a TemplateNode
+pub fn best(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
     let commands_identifier = match take_token(iter, "commands".to_string())
         .expect("Couldn't read commands identifier")

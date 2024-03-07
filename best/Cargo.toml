@@ -1,5 +1,5 @@
 [package]
-name = "hevy"
+name = "best"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,7 +11,7 @@ bevy = { version = "0.13.0", default-features = false }
 either = "1.10.0"
 thiserror = "1.0.57"
 map-macro = "0.3.0"
-hevy-macros = { path = "../hevy-macros" }
+best-macros = { path = "../best-macros" }
 axum-core = "0.4.3"
 futures = "0.3.30"
 tokio = { version = "1.36.0", features = ["sync", "full"] }

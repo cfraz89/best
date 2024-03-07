@@ -202,6 +202,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "best"
+version = "0.1.0"
+dependencies = [
+ "axum-core",
+ "best-macros",
+ "bevy",
+ "either",
+ "futures",
+ "map-macro",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "best-macros"
+version = "0.1.0"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tap",
+ "thiserror",
+]
+
+[[package]]
 name = "bevy"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -663,8 +690,8 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "axum-macros",
+ "best",
  "bevy",
- "hevy",
  "tokio",
  "tower-http",
  "tracing-subscriber",
@@ -938,33 +965,6 @@ name = "hermit-abi"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d77f7ec81a6d05a3abb01ab6eb7590f6083d08449fe5a1c8b1e620283546ccb7"
-
-[[package]]
-name = "hevy"
-version = "0.1.0"
-dependencies = [
- "axum-core",
- "bevy",
- "either",
- "futures",
- "hevy-macros",
- "map-macro",
- "thiserror",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "hevy-macros"
-version = "0.1.0"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "syn",
- "tap",
- "thiserror",
-]
 
 [[package]]
 name = "http"

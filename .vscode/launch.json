@@ -49,11 +49,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'hevy-rs-lib'",
+      "name": "Debug unit tests in library 'best-rs-lib'",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=hevy-rs-lib"],
+        "args": ["test", "--no-run", "--lib", "--package=best-rs-lib"],
         "filter": {
-          "name": "hevy-rs-lib",
+          "name": "best-rs-lib",
           "kind": "lib"
         }
       },
