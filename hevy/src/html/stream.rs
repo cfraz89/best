@@ -7,7 +7,7 @@ use bevy::{prelude::*, tasks::futures_lite::Stream};
 use either::Either;
 use thiserror::Error;
 
-use crate::r#async::{update_tasks, AsyncContext};
+use crate::r#async::update_tasks;
 
 use super::render::RenderOutput;
 

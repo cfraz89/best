@@ -11,7 +11,7 @@ use crate::{
         render::{add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput},
         styles::apply_styles,
     },
-    r#async::{process_async_callbacks, AsyncContext, AsyncReceivers, AsyncTasks},
+    r#async::{process_async_callbacks, AsyncTasks},
 };
 
 use super::tag::{Main, Time, *};
@@ -97,13 +97,11 @@ impl Plugin for RenderHtmlPlugin {
         let (commands_callback_tx, commands_callback_rx) = mpsc::channel(100);
         app.insert_resource(AsyncTasks {
             map: HashMap::new(),
+            world_callback_rx: Arc::new(RwLock::new(world_callback_rx)),
             world_callback_tx,
+            commands_callback_rx: Arc::new(RwLock::new(commands_callback_rx)),
             commands_callback_tx,
         });
         app.insert_resource(RenderOutput(Either::Left(String::new())));
-        app.insert_resource(AsyncReceivers {
-            world_callback_rx: Arc::new(RwLock::new(world_callback_rx)),
-            commands_callback_rx: Arc::new(RwLock::new(commands_callback_rx)),
-        });
     }
 }
