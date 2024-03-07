@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    rc::Rc,
-    sync::{Arc, RwLock},
-};
+use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -11,7 +7,7 @@ use crate::{
         render::{add_render_tags, add_render_tags_for_text, render_tags_to_output, RenderOutput},
         styles::apply_styles,
     },
-    r#async::{process_async_callbacks, AsyncTasks},
+    r#async::{process_async_callbacks, update_tasks, AsyncTasks},
 };
 
 use super::tag::{Main, Time, *};
@@ -63,6 +59,8 @@ impl Plugin for RenderHtmlPlugin {
             reset_render_attributes.after(HtmlRenderSet::ApplyTags),
         );
 
+        app.add_systems(Update, (update_tasks, process_async_callbacks));
+
         // Apply attributes to render attributes
         app.add_systems(
             PostUpdate,
@@ -91,7 +89,6 @@ impl Plugin for RenderHtmlPlugin {
                 .after(HtmlRenderSet::AddTags)
                 .after(HtmlRenderSet::ApplyAttributes),
         );
-        app.add_systems(Update, process_async_callbacks);
 
         let (world_callback_tx, world_callback_rx) = mpsc::channel(100);
         let (commands_callback_tx, commands_callback_rx) = mpsc::channel(100);

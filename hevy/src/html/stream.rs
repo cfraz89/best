@@ -7,7 +7,7 @@ use bevy::{prelude::*, tasks::futures_lite::Stream};
 use either::Either;
 use thiserror::Error;
 
-use crate::r#async::update_tasks;
+use crate::r#async::AsyncWaker;
 
 use super::render::RenderOutput;
 
@@ -27,7 +27,8 @@ impl Stream for AppHtmlStream {
     type Item = Result<String, Never>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        update_tasks(&mut self.app.world, cx);
+        self.app
+            .insert_resource(AsyncWaker(Some(cx.waker().clone())));
         self.app.update();
         let render_output = self.app.world.get_resource::<RenderOutput>().unwrap();
         match render_output.0.clone() {
