@@ -16,11 +16,10 @@ use tokio::sync::mpsc::{Receiver, Sender};
 pub struct AsyncTasks {
     pub(crate) map:
         HashMap<Entity, HashMap<usize, Pin<Box<dyn Future<Output = ()> + Sync + Send + 'static>>>>,
-    pub(crate) world_callback_rx:
-        Arc<RwLock<Receiver<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>>>,
+    pub(crate) world_callback_rx: Receiver<Box<dyn Fn(&mut World) -> () + Send + Sync + 'static>>,
     pub(crate) world_callback_tx: Sender<Box<dyn Fn(&mut World) -> () + Send + Sync>>,
     pub(crate) commands_callback_rx:
-        Arc<RwLock<Receiver<Box<dyn Fn(&mut Commands) -> () + Send + Sync + 'static>>>>,
+        Receiver<Box<dyn Fn(&mut Commands) -> () + Send + Sync + 'static>>,
     pub(crate) commands_callback_tx: Sender<Box<dyn Fn(&mut Commands) -> () + Send + Sync>>,
 }
 
@@ -110,19 +109,20 @@ pub fn update_tasks(world: &mut World, context: &mut Context<'_>) {
 }
 
 pub(crate) fn process_async_callbacks(world: &mut World) {
-    let world_callback_rx = { world.resource_mut::<AsyncTasks>().world_callback_rx.clone() };
-    while let Ok(cb) = world_callback_rx.write().unwrap().try_recv() {
+    while let Ok(cb) = world
+        .resource_mut::<AsyncTasks>()
+        .world_callback_rx
+        .try_recv()
+    {
         cb(world);
     }
 
     let mut command_queue = CommandQueue::default();
-    let commands_callback_rx = {
-        world
-            .resource_mut::<AsyncTasks>()
-            .commands_callback_rx
-            .clone()
-    };
-    while let Ok(cb) = commands_callback_rx.write().unwrap().try_recv() {
+    while let Ok(cb) = world
+        .resource_mut::<AsyncTasks>()
+        .commands_callback_rx
+        .try_recv()
+    {
         let mut commands = Commands::new(&mut command_queue, world);
         cb(&mut commands);
     }
