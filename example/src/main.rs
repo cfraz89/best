@@ -1,7 +1,7 @@
 #![feature(async_closure)]
 use axum::{response::IntoResponse, routing::get, Router};
 use best::axum_html::AxumHtmlApp;
-use best::r#async::AsyncCallbacks;
+use best::r#async::WorldCallback;
 use tower_http::services::ServeDir;
 
 use best::html::*;
@@ -46,11 +46,11 @@ struct NotYolo;
 
 fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<AsyncTasks>) {
     for entity in &query {
-        async_tasks.run_async(entity, async move |cbs: AsyncCallbacks| {
+        async_tasks.run_async(entity, async move |cb: WorldCallback| {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-            cbs.with_commands(move |commands| {
-                let ent = best!(commands,<H1>{"Not yolo"}).id();
-                commands.entity(entity).add_child(ent);
+            cb.with_world(move |world| {
+                let ent = best!(world,<H1>{"Not yolo"}).id();
+                world.entity_mut(entity).add_child(ent);
                 // set_child(
                 //     commands,
                 //     entity,
