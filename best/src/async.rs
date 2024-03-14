@@ -1,11 +1,7 @@
-use bevy::ecs::system::CommandQueue;
 use bevy::prelude::*;
 use bevy::tasks::futures_lite::FutureExt;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
-use std::mem::transmute;
-use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::task::Waker;
 use std::task::{Context, Poll::Ready};

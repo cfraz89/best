@@ -1,6 +1,7 @@
 #![feature(async_closure)]
 use axum::{response::IntoResponse, routing::get, Router};
 use best::axum_html::AxumHtmlApp;
+use best::node::BestNode;
 use best::r#async::WorldCallback;
 use tower_http::services::ServeDir;
 
@@ -30,18 +31,24 @@ async fn root() -> impl IntoResponse {
 }
 
 pub fn init_page(mut commands: Commands) {
-    best!(commands,
+    best!(
         <Div Page> {
             "Hello"
             <Div Styles(hash_map! {"color" => "red"})> {
                 "Yolo"
             }
             <Div NotYolo>
+            #if show_fred {
+                <Div Styles(hash_map! {"color" => "blue"})> {
+                    "Fred"
+                }
+            }
         }
-    );
+    )
+    .spawn(&mut commands);
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 struct NotYolo;
 
 fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<AsyncTasks>) {
@@ -49,8 +56,8 @@ fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<Asy
         async_tasks.run_async(entity, async move |cb: WorldCallback| {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             cb.with_world(move |world| {
-                let ent = best!(world,<H1>{"Not yolo"}).id();
-                world.entity_mut(entity).add_child(ent);
+                let ents = best!(<H1>{"Not yolo"}).world_spawn(world);
+                world.entity_mut(entity).push_children(&ents);
                 // set_child(
                 //     commands,
                 //     entity,

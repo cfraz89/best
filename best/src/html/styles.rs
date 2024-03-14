@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use super::attributes::RenderAttributes;
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct Styles(pub HashMap<&'static str, &'static str>);
 
 pub fn apply_styles(mut commands: Commands, query: Query<(Entity, &RenderAttributes, &Styles)>) {

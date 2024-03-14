@@ -1,7 +1,7 @@
 #![feature(proc_macro_span)]
 #![feature(proc_macro_diagnostic)]
 mod best;
-mod entity_node;
+mod node;
 
 use proc_macro::TokenStream;
 

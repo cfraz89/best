@@ -13,7 +13,7 @@ macro_rules! make_tag {
     };
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct Tag(pub &'static str);
 
 /// All the shorthand components use this system to add the Tag component

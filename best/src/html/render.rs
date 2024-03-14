@@ -19,7 +19,7 @@ pub(crate) enum RenderTag {
 #[derive(Resource)]
 pub(crate) struct RenderOutput(pub(crate) Either<String, String>);
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct Page;
 
 static NO_SELF_CLOSE_TAGS: [&str; 3] = ["script", "style", "template"];

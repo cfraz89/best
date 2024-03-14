@@ -1,34 +1,15 @@
 use std::{iter::Peekable, sync::Arc};
 
-use proc_macro2::{token_stream::IntoIter, Delimiter, Ident, Punct, Span, TokenStream, TokenTree};
+use proc_macro2::{token_stream::IntoIter, Delimiter, Punct, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens, TokenStreamExt};
 
-use crate::entity_node::EntityNode;
+use crate::node::BestMacroNode;
 
 /// Parse a best notation macro template into a TemplateNode
 pub fn best(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
-    let commands_identifier = match take_token(iter, "commands".to_string())
-        .expect("Couldn't read commands identifier")
-    {
-        TokenTree::Ident(i) => i,
-        t => {
-            t.span()
-                .unwrap()
-                .error(format!(
-                    "invalid token, expected commands variable identifier, found {t}"
-                ))
-                .emit();
-            panic!("Failed to parse ecn! macro");
-        }
-    };
-    parse_punct(
-        &take_token(iter, ','.to_string()).expect("Expecting comma"),
-        ',',
-    )
-    .expect("Couldn't read comma");
 
-    match parse_entity(commands_identifier, iter) {
+    match parse_entity(iter) {
         Ok(node) => node.to_token_stream().into(),
         Err(ParseError::EndOfInput { expected }) => {
             panic!("Unexpected end of input, expected {}", expected)
@@ -93,21 +74,16 @@ fn parse_punct(input: &TokenTree, punct: char) -> Result<(), ParseError> {
 }
 
 /// Parse an entity node, which takes the form <component1 component2> { children...} or "text"
-fn parse_entity(
-    builder_identifier: Ident,
-    iter: &mut Peekable<IntoIter>,
-) -> Result<Option<EntityNode>, ParseError> {
+fn parse_entity(iter: &mut Peekable<IntoIter>) -> Result<Option<BestMacroNode>, ParseError> {
     let token: Result<TokenTree, ParseError>;
-    token = take_token(iter, "<components> or text string".to_string());
+    token = take_token(iter, "<components>, #if, or text string".to_string());
     match token.clone() {
-        Ok(TokenTree::Punct(p)) if p.as_char() == '<' => {
-            parse_components(builder_identifier, iter).map(Some)
-        }
+        Ok(TokenTree::Punct(p)) if p.as_char() == '<' => parse_components(iter).map(Some),
+        Ok(TokenTree::Punct(p)) if p.as_char() == '#' => parse_if(iter).map(Some),
         Ok(TokenTree::Literal(_)) => {
             let lit: TokenStream = token?.into();
-            Ok(Some(EntityNode {
-                builder_identifier,
-                components: quote!(Text(#lit.to_string())),
+            Ok(Some(BestMacroNode::Entity {
+                bundle: quote!(Text(#lit.to_string())),
                 child_nodes: Arc::new(vec![]),
             }))
         }
@@ -121,10 +97,7 @@ fn parse_entity(
 }
 
 /// Parse components of an entity node, which is a space seperated list of struct initializers
-fn parse_components(
-    builder_identifier: Ident,
-    iter: &mut Peekable<IntoIter>,
-) -> Result<EntityNode, ParseError> {
+fn parse_components(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, ParseError> {
     let mut tokens: TokenStream = TokenStream::new();
     loop {
         let token = take_token(iter, "component or >".to_string())?;
@@ -167,7 +140,7 @@ fn parse_components(
         Ok(TokenTree::Group(ref g)) if g.delimiter() == Delimiter::Brace => {
             let mut inner = g.stream().into_iter().peekable();
             loop {
-                let child = parse_entity(Ident::new("builder", next.clone()?.span()), &mut inner)?;
+                let child = parse_entity(&mut inner)?;
                 if let Some(child) = child {
                     child_nodes.push(child);
                 } else {
@@ -179,9 +152,62 @@ fn parse_components(
         }
         _ => {}
     }
-    Ok(EntityNode {
-        builder_identifier,
-        components: tokens,
+    Ok(BestMacroNode::Entity {
+        bundle: tokens,
         child_nodes: Arc::new(child_nodes),
     })
+}
+
+fn parse_if(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, ParseError> {
+    let token = take_token(iter, "if".to_string())?;
+    match token {
+        TokenTree::Ident(i) if i.to_string() == "if" => {
+            let condition = parse_condition(iter)?;
+            let next = peek_token(iter, "{".to_string())?;
+            match next {
+                TokenTree::Group(ref g) if g.delimiter() == Delimiter::Brace => {
+                    let mut inner = g.stream().into_iter().peekable();
+                    let mut child_nodes = vec![];
+                    loop {
+                        let child = parse_entity(&mut inner)?;
+                        if let Some(child) = child {
+                            child_nodes.push(child);
+                        } else {
+                            break;
+                        }
+                    }
+                    //Advance the outer iterator to go over the group
+                    iter.next();
+                    Ok(BestMacroNode::If {
+                        condition,
+                        child_nodes: Arc::new(child_nodes),
+                    })
+                }
+                _ => Err(ParseError::UnexpectedToken {
+                    expected: "{".to_string(),
+                    found: next.to_string(),
+                    at: next.span(),
+                }),
+            }
+        }
+        _ => Err(ParseError::UnexpectedToken {
+            expected: "if".to_string(),
+            found: token.to_string(),
+            at: token.span(),
+        }),
+    }
+}
+
+fn parse_condition(iter: &mut Peekable<IntoIter>) -> Result<TokenStream, ParseError> {
+    let mut tokens: TokenStream = TokenStream::new();
+    loop {
+        let token = take_token(iter, "condition or }".to_string())?;
+        match token.clone() {
+            TokenTree::Group(p) if p.delimiter() == Delimiter::Brace => break,
+            _ => {
+                tokens.append(token);
+            }
+        }
+    }
+    Ok(tokens)
 }
