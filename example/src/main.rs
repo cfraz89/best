@@ -31,6 +31,7 @@ async fn root() -> impl IntoResponse {
 }
 
 pub fn init_page(mut commands: Commands) {
+    let show_fred: bool = false;
     best!(
         <Div Page> {
             "Hello"

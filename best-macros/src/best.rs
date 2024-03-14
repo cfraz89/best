@@ -1,6 +1,6 @@
 use std::{iter::Peekable, sync::Arc};
 
-use proc_macro2::{token_stream::IntoIter, Delimiter, Punct, Span, TokenStream, TokenTree};
+use proc_macro2::{token_stream::IntoIter, Delimiter, Group, Punct, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens, TokenStreamExt};
 
 use crate::node::BestMacroNode;
@@ -162,33 +162,23 @@ fn parse_if(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, ParseError> 
     let token = take_token(iter, "if".to_string())?;
     match token {
         TokenTree::Ident(i) if i.to_string() == "if" => {
-            let condition = parse_condition(iter)?;
-            let next = peek_token(iter, "{".to_string())?;
-            match next {
-                TokenTree::Group(ref g) if g.delimiter() == Delimiter::Brace => {
-                    let mut inner = g.stream().into_iter().peekable();
-                    let mut child_nodes = vec![];
-                    loop {
-                        let child = parse_entity(&mut inner)?;
-                        if let Some(child) = child {
-                            child_nodes.push(child);
-                        } else {
-                            break;
-                        }
-                    }
-                    //Advance the outer iterator to go over the group
-                    iter.next();
-                    Ok(BestMacroNode::If {
-                        condition,
-                        child_nodes: Arc::new(child_nodes),
-                    })
+            let (condition, inner_tree) = parse_if_inner(iter)?;
+            let mut inner = inner_tree.stream().into_iter().peekable();
+            let mut child_nodes = vec![];
+            loop {
+                let child = parse_entity(&mut inner)?;
+                if let Some(child) = child {
+                    child_nodes.push(child);
+                } else {
+                    break;
                 }
-                _ => Err(ParseError::UnexpectedToken {
-                    expected: "{".to_string(),
-                    found: next.to_string(),
-                    at: next.span(),
-                }),
             }
+            //Advance the outer iterator to go over the group
+            iter.next();
+            Ok(BestMacroNode::If {
+                condition,
+                child_nodes: Arc::new(child_nodes),
+            })
         }
         _ => Err(ParseError::UnexpectedToken {
             expected: "if".to_string(),
@@ -198,16 +188,18 @@ fn parse_if(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, ParseError> 
     }
 }
 
-fn parse_condition(iter: &mut Peekable<IntoIter>) -> Result<TokenStream, ParseError> {
-    let mut tokens: TokenStream = TokenStream::new();
+/// Return the condition and inner tokens of an if statement
+fn parse_if_inner(iter: &mut Peekable<IntoIter>) -> Result<(TokenStream, Group), ParseError> {
+    let mut condition_tokens: TokenStream = TokenStream::new();
     loop {
-        let token = take_token(iter, "condition or }".to_string())?;
-        match token.clone() {
-            TokenTree::Group(p) if p.delimiter() == Delimiter::Brace => break,
+        let token = take_token(iter, "condition, or { children }".to_string())?;
+        match &token {
+            TokenTree::Group(p) if p.delimiter() == Delimiter::Brace => {
+                return Ok((condition_tokens, p.clone()));
+            }
             _ => {
-                tokens.append(token);
+                condition_tokens.append(token);
             }
         }
     }
-    Ok(tokens)
 }

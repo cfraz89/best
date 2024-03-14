@@ -31,7 +31,7 @@ impl ToTokens for BestMacroNode {
                     });
                     tokens.extend(quote! {
                         best::node::IfNode {
-                            condition: || #condition,
+                            condition: move || #condition,
                             child_nodes: vec![#(#child_nodes),*],
                         }
                     })
