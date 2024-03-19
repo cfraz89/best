@@ -1,5 +1,5 @@
 [package]
-name = "best-macros"
+name = "chimera-rs-macros"
 version = "0.1.0"
 edition = "2021"
 

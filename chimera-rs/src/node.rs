@@ -2,21 +2,21 @@ use bevy::prelude::*;
 
 pub struct IfNode<F> {
     pub condition: F,
-    pub child_nodes: Vec<Box<dyn BestNode>>,
+    pub child_nodes: Vec<Box<dyn ChimeraNode>>,
 }
 pub struct EntityNode<B> {
     pub bundle: B,
-    pub child_nodes: Vec<Box<dyn BestNode>>,
+    pub child_nodes: Vec<Box<dyn ChimeraNode>>,
 }
 
-pub trait BestNode {
+pub trait ChimeraNode {
     fn spawn(&self, commands: &mut Commands) -> Vec<Entity>;
     fn world_spawn(&self, world: &mut World) -> Vec<Entity>;
     fn child_spawn(&self, builder: &mut ChildBuilder) -> Vec<Entity>;
     fn world_child_spawn(&self, world: &mut WorldChildBuilder) -> Vec<Entity>;
 }
 
-impl<T: Bundle + Clone> BestNode for EntityNode<T> {
+impl<T: Bundle + Clone> ChimeraNode for EntityNode<T> {
     fn spawn(&self, commands: &mut Commands) -> Vec<Entity> {
         let mut entity = commands.spawn(self.bundle.clone());
         if self.child_nodes.len() > 0 {
@@ -66,7 +66,7 @@ impl<T: Bundle + Clone> BestNode for EntityNode<T> {
     }
 }
 
-impl<F: Fn() -> bool> BestNode for IfNode<F> {
+impl<F: Fn() -> bool> ChimeraNode for IfNode<F> {
     fn spawn(&self, commands: &mut Commands) -> Vec<Entity> {
         if (self.condition)() {
             self.child_nodes

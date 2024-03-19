@@ -49,11 +49,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'best-rs-lib'",
+      "name": "Debug unit tests in library 'chimera-rs-lib'",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=best-rs-lib"],
+        "args": ["test", "--no-run", "--lib", "--package=chimera-rs-lib"],
         "filter": {
-          "name": "best-rs-lib",
+          "name": "chimera-rs-lib",
           "kind": "lib"
         }
       },

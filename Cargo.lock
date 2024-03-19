@@ -202,33 +202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "best"
-version = "0.1.0"
-dependencies = [
- "axum-core",
- "best-macros",
- "bevy",
- "either",
- "futures",
- "map-macro",
- "thiserror",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "best-macros"
-version = "0.1.0"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "syn",
- "tap",
- "thiserror",
-]
-
-[[package]]
 name = "bevy"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -604,6 +577,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chimera-rs"
+version = "0.1.0"
+dependencies = [
+ "axum-core",
+ "bevy",
+ "chimera-rs-macros",
+ "either",
+ "futures",
+ "map-macro",
+ "thiserror",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "chimera-rs-macros"
+version = "0.1.0"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tap",
+ "thiserror",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -690,8 +690,8 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "axum-macros",
- "best",
  "bevy",
+ "chimera-rs",
  "tokio",
  "tower-http",
  "tracing-subscriber",

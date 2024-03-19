@@ -1,5 +1,5 @@
 [workspace]
-members = ["example", "best", "best-macros"]
+members = ["example", "chimera-rs", "chimera-rs-macros"]
 resolver = "2"
 
 [profile.release]

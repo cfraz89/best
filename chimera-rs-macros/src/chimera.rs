@@ -3,10 +3,10 @@ use std::{iter::Peekable, sync::Arc};
 use proc_macro2::{token_stream::IntoIter, Delimiter, Group, Punct, Span, TokenStream, TokenTree};
 use quote::{quote, ToTokens, TokenStreamExt};
 
-use crate::node::BestMacroNode;
+use crate::node::ChimeraMacroNode;
 
-/// Parse a best notation macro template into a TemplateNode
-pub fn best(input: TokenStream) -> TokenStream {
+/// Parse a chimera notation macro template into a TemplateNode
+pub fn chimera(input: TokenStream) -> TokenStream {
     let iter = &mut input.into_iter().peekable();
 
     match parse_entity(iter) {
@@ -74,7 +74,7 @@ fn parse_punct(input: &TokenTree, punct: char) -> Result<(), ParseError> {
 }
 
 /// Parse an entity node, which takes the form <component1 component2> { children...} or "text"
-fn parse_entity(iter: &mut Peekable<IntoIter>) -> Result<Option<BestMacroNode>, ParseError> {
+fn parse_entity(iter: &mut Peekable<IntoIter>) -> Result<Option<ChimeraMacroNode>, ParseError> {
     let token: Result<TokenTree, ParseError>;
     token = take_token(iter, "<components>, #if, or text string".to_string());
     match token.clone() {
@@ -82,7 +82,7 @@ fn parse_entity(iter: &mut Peekable<IntoIter>) -> Result<Option<BestMacroNode>, 
         Ok(TokenTree::Punct(p)) if p.as_char() == '#' => parse_if(iter).map(Some),
         Ok(TokenTree::Literal(_)) => {
             let lit: TokenStream = token?.into();
-            Ok(Some(BestMacroNode::Entity {
+            Ok(Some(ChimeraMacroNode::Entity {
                 bundle: quote!(Text(#lit.to_string())),
                 child_nodes: Arc::new(vec![]),
             }))
@@ -97,7 +97,7 @@ fn parse_entity(iter: &mut Peekable<IntoIter>) -> Result<Option<BestMacroNode>, 
 }
 
 /// Parse components of an entity node, which is a space seperated list of struct initializers
-fn parse_components(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, ParseError> {
+fn parse_components(iter: &mut Peekable<IntoIter>) -> Result<ChimeraMacroNode, ParseError> {
     let mut tokens: TokenStream = TokenStream::new();
     loop {
         let token = take_token(iter, "component or >".to_string())?;
@@ -152,13 +152,13 @@ fn parse_components(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, Pars
         }
         _ => {}
     }
-    Ok(BestMacroNode::Entity {
+    Ok(ChimeraMacroNode::Entity {
         bundle: tokens,
         child_nodes: Arc::new(child_nodes),
     })
 }
 
-fn parse_if(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, ParseError> {
+fn parse_if(iter: &mut Peekable<IntoIter>) -> Result<ChimeraMacroNode, ParseError> {
     let token = take_token(iter, "if".to_string())?;
     match token {
         TokenTree::Ident(i) if i.to_string() == "if" => {
@@ -175,7 +175,7 @@ fn parse_if(iter: &mut Peekable<IntoIter>) -> Result<BestMacroNode, ParseError> 
             }
             //Advance the outer iterator to go over the group
             iter.next();
-            Ok(BestMacroNode::If {
+            Ok(ChimeraMacroNode::If {
                 condition,
                 child_nodes: Arc::new(child_nodes),
             })

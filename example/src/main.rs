@@ -1,13 +1,12 @@
 #![feature(async_closure)]
 use axum::{response::IntoResponse, routing::get, Router};
-use best::axum_html::AxumHtmlApp;
-use best::node::BestNode;
-use best::r#async::WorldCallback;
+use chimera_rs::axum_html::AxumHtmlApp;
+use chimera_rs::node::ChimeraNode;
+use chimera_rs::r#async::WorldCallback;
 use tower_http::services::ServeDir;
 
-use best::html::*;
-use best::prelude::*;
 use bevy::prelude::*;
+use chimera_rs::prelude::*;
 
 #[tokio::main]
 async fn main() {
@@ -32,7 +31,7 @@ async fn root() -> impl IntoResponse {
 
 pub fn init_page(mut commands: Commands) {
     let show_fred: bool = false;
-    best!(
+    chimera!(
         <Div Page> {
             "Hello"
             <Div Styles(hash_map! {"color" => "red"})> {
@@ -57,13 +56,8 @@ fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<Asy
         async_tasks.run_async(entity, async move |cb: WorldCallback| {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             cb.with_world(move |world| {
-                let ents = best!(<H1>{"Not yolo"}).world_spawn(world);
+                let ents = chimera!(<H1>{"Not yolo"}).world_spawn(world);
                 world.entity_mut(entity).push_children(&ents);
-                // set_child(
-                //     commands,
-                //     entity,
-                //     Text("Not yolo".to_string()),
-                // );
             })
             .await;
         });
