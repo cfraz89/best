@@ -6,7 +6,7 @@ use quote::{quote, ToTokens};
 #[derive(Debug, Clone)]
 pub enum ChimeraMacroNode {
     Entity {
-        bundle: TokenStream,
+        components: Vec<TokenStream>,
         child_nodes: Arc<Vec<ChimeraMacroNode>>,
     },
     If {
@@ -50,13 +50,13 @@ impl ToTokens for ChimeraMacroNode {
                     })
                 }
                 ChimeraMacroNode::Entity {
-                    bundle,
+                    components,
                     child_nodes,
                 } => {
                     let child_nodes = child_nodes.iter().map(|c| c.to_tokens_any_node());
                     tokens.extend(quote! {
                         chimera_rs::node::EntityNode {
-                            bundle: (#bundle),
+                            bundle: (#(#components),*),
                             child_nodes: vec![#(#child_nodes),*],
                         }
                     })

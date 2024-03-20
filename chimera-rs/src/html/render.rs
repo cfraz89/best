@@ -1,8 +1,8 @@
 use either::Either;
 
-use crate::{r#async::AsyncTasks, text::Text};
+use crate::r#async::AsyncTasks;
 
-use super::{attributes::RenderAttributes, tag::Tag};
+use super::{attributes::RenderAttributes, tag::Tag, text::Text};
 use bevy::prelude::*;
 use std::fmt::Write;
 
@@ -18,9 +18,6 @@ pub(crate) enum RenderTag {
 
 #[derive(Resource)]
 pub(crate) struct RenderOutput(pub(crate) Either<String, String>);
-
-#[derive(Component, Clone)]
-pub struct Page;
 
 static NO_SELF_CLOSE_TAGS: [&str; 3] = ["script", "style", "template"];
 
@@ -177,9 +174,12 @@ fn render_children(
     Ok(Either::Right(output))
 }
 
-//System to consume our tags into output resource
+/// System to consume our tags into output resource
+/// Tries to find the root element via a query filter, and renders that
 pub(crate) fn render_tags_to_output(world: &mut World) {
-    let entity = world.query_filtered::<Entity, With<Page>>().single(world);
+    let entity = world
+        .query_filtered::<Entity, (Or<(With<Tag>, With<Text>)>, Without<Parent>)>()
+        .single(world);
     let rendered = render_entity_tags(world, entity).unwrap();
     let mut output = world.get_resource_mut::<RenderOutput>().unwrap();
     output.0 = rendered;

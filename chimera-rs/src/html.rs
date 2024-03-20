@@ -4,7 +4,8 @@ pub mod render;
 pub mod stream;
 pub mod styles;
 pub mod tag;
+pub mod text;
 
-pub use render::Page;
 pub use styles::*;
 pub use tag::*;
+pub use text::*;

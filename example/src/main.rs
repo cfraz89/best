@@ -25,37 +25,39 @@ async fn main() {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    AxumHtmlApp::new((init_page, replace_yolo).chain())
+    AxumHtmlApp::new((init_page, handle_sleeps).chain())
 }
 
 pub fn init_page(mut commands: Commands) {
-    let show_fred: bool = false;
+    let show_fred: bool = true;
     chimera!(
-        <Div Page> {
-            "Hello"
-            <Div Styles(hash_map! {"color" => "red"})> {
-                "Yolo"
-            }
-            <Div NotYolo>
-            #if show_fred {
-                <Div Styles(hash_map! {"color" => "blue"})> {
-                    "Fred"
+        <div>
+            Hello
+            <div Styles(hash_map! {"color" => "red"})>
+                Yolo
+            </div>
+            <div Sleep(3)>
+                #if show_fred {
+                    <div Styles(hash_map! {"color" => "blue"})>
+                        Fred
+                    </div>
                 }
-            }
-        }
+            </div>
+        </div>
     )
     .spawn(&mut commands);
 }
 
 #[derive(Component, Clone)]
-struct NotYolo;
+struct Sleep(u64);
 
-fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<AsyncTasks>) {
-    for entity in &query {
+fn handle_sleeps(query: Query<(Entity, &Sleep)>, mut async_tasks: ResMut<AsyncTasks>) {
+    for (entity, Sleep(duration)) in &query {
+        let duration = duration.clone();
         async_tasks.run_async(entity, async move |cb: WorldCallback| {
-            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(duration)).await;
             cb.with_world(move |world| {
-                let ent = chimera!(<H1>{"Not yolo"}).spawn_with_world(world);
+                let ent = chimera!(<h1>Slept for {duration} seconds</h1>).spawn_with_world(world);
                 world.entity_mut(entity).add_child(ent);
             })
             .await;

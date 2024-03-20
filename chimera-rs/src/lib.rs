@@ -4,4 +4,3 @@ pub mod html;
 pub mod logic;
 pub mod node;
 pub mod prelude;
-pub mod text;
