@@ -17,22 +17,22 @@ pub enum AnyChimeraNode {
     If(Box<dyn AnyIfNode>),
 }
 
-pub trait AnyEntityNode {
-    fn spawn(&self, commands: &mut Commands) -> Entity;
-    fn spawn_with_child_builder(&self, child_builder: &mut ChildBuilder) -> Entity;
-    fn spawn_with_world(&self, world: &mut World) -> Entity;
-    fn spawn_with_world_child_builder(&self, child_builder: &mut WorldChildBuilder) -> Entity;
+macro_rules! define_node_trait {
+    ($trait_name:ident, $return_type:ty) => {
+        pub trait $trait_name {
+            fn spawn(&self, commands: &mut Commands) -> $return_type;
+            fn spawn_with_child_builder(&self, child_builder: &mut ChildBuilder) -> $return_type;
+            fn spawn_with_world(&self, world: &mut World) -> $return_type;
+            fn spawn_with_world_child_builder(
+                &self,
+                child_builder: &mut WorldChildBuilder,
+            ) -> $return_type;
+        }
+    };
 }
 
-pub trait AnyIfNode {
-    fn spawn(&self, commands: &mut Commands) -> Option<Vec<Entity>>;
-    fn spawn_with_child_builder(&self, child_builder: &mut ChildBuilder) -> Option<Vec<Entity>>;
-    fn spawn_with_world(&self, world: &mut World) -> Option<Vec<Entity>>;
-    fn spawn_with_world_child_builder(
-        &self,
-        child_builder: &mut WorldChildBuilder,
-    ) -> Option<Vec<Entity>>;
-}
+define_node_trait!(AnyEntityNode, Entity);
+define_node_trait!(AnyIfNode, Option<Vec<Entity>>);
 
 macro_rules! impl_entity_node_spawn {
     ($name:ident, $builder:ident, $builder_type: ident, $child_builder_func: ident) => {
