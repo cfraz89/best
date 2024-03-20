@@ -1,7 +1,6 @@
 #![feature(async_closure)]
 use axum::{response::IntoResponse, routing::get, Router};
 use chimera_rs::axum_html::AxumHtmlApp;
-use chimera_rs::node::ChimeraNode;
 use chimera_rs::r#async::WorldCallback;
 use tower_http::services::ServeDir;
 
@@ -56,8 +55,8 @@ fn replace_yolo(query: Query<Entity, With<NotYolo>>, mut async_tasks: ResMut<Asy
         async_tasks.run_async(entity, async move |cb: WorldCallback| {
             tokio::time::sleep(std::time::Duration::from_secs(3)).await;
             cb.with_world(move |world| {
-                let ents = chimera!(<H1>{"Not yolo"}).world_spawn(world);
-                world.entity_mut(entity).push_children(&ents);
+                let ent = chimera!(<H1>{"Not yolo"}).spawn_with_world(world);
+                world.entity_mut(entity).add_child(ent);
             })
             .await;
         });

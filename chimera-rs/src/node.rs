@@ -1,113 +1,111 @@
-use bevy::prelude::*;
+use std::rc::Rc;
+
+use bevy::{ecs::system::EntityCommands, prelude::*};
+use futures::task::Spawn;
 
 pub struct IfNode<F> {
     pub condition: F,
-    pub child_nodes: Vec<Box<dyn ChimeraNode>>,
+    pub child_nodes: Vec<AnyChimeraNode>,
 }
 pub struct EntityNode<B> {
     pub bundle: B,
-    pub child_nodes: Vec<Box<dyn ChimeraNode>>,
+    pub child_nodes: Vec<AnyChimeraNode>,
 }
 
-pub trait ChimeraNode {
-    fn spawn(&self, commands: &mut Commands) -> Vec<Entity>;
-    fn world_spawn(&self, world: &mut World) -> Vec<Entity>;
-    fn child_spawn(&self, builder: &mut ChildBuilder) -> Vec<Entity>;
-    fn world_child_spawn(&self, world: &mut WorldChildBuilder) -> Vec<Entity>;
+pub enum AnyChimeraNode {
+    Entity(Box<dyn AnyEntityNode>),
+    If(Box<dyn AnyIfNode>),
 }
 
-impl<T: Bundle + Clone> ChimeraNode for EntityNode<T> {
-    fn spawn(&self, commands: &mut Commands) -> Vec<Entity> {
-        let mut entity = commands.spawn(self.bundle.clone());
-        if self.child_nodes.len() > 0 {
-            entity.with_children(|builder| {
-                for child in &self.child_nodes {
-                    child.child_spawn(builder);
-                }
-            });
-        }
-        vec![entity.id()]
-    }
-
-    fn world_spawn(&self, world: &mut World) -> Vec<Entity> {
-        let mut entity = world.spawn(self.bundle.clone());
-        if self.child_nodes.len() > 0 {
-            entity.with_children(|builder| {
-                for child in &self.child_nodes {
-                    child.world_child_spawn(builder);
-                }
-            });
-        }
-        vec![entity.id()]
-    }
-
-    fn world_child_spawn(&self, builder: &mut WorldChildBuilder) -> Vec<Entity> {
-        let mut entity = builder.spawn(self.bundle.clone());
-        if self.child_nodes.len() > 0 {
-            entity.with_children(|builder| {
-                for child in &self.child_nodes {
-                    child.world_child_spawn(builder);
-                }
-            });
-        }
-        vec![entity.id()]
-    }
-
-    fn child_spawn(&self, builder: &mut ChildBuilder) -> Vec<Entity> {
-        let mut entity = builder.spawn(self.bundle.clone());
-        if self.child_nodes.len() > 0 {
-            entity.with_children(|builder| {
-                for child in &self.child_nodes {
-                    child.child_spawn(builder);
-                }
-            });
-        }
-        vec![entity.id()]
-    }
+pub trait AnyEntityNode {
+    fn spawn(&self, commands: &mut Commands) -> Entity;
+    fn spawn_with_child_builder(&self, child_builder: &mut ChildBuilder) -> Entity;
+    fn spawn_with_world(&self, world: &mut World) -> Entity;
+    fn spawn_with_world_child_builder(&self, child_builder: &mut WorldChildBuilder) -> Entity;
 }
 
-impl<F: Fn() -> bool> ChimeraNode for IfNode<F> {
-    fn spawn(&self, commands: &mut Commands) -> Vec<Entity> {
-        if (self.condition)() {
-            self.child_nodes
-                .iter()
-                .flat_map(|c| c.spawn(commands))
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
+pub trait AnyIfNode {
+    fn spawn(&self, commands: &mut Commands) -> Option<Vec<Entity>>;
+    fn spawn_with_child_builder(&self, child_builder: &mut ChildBuilder) -> Option<Vec<Entity>>;
+    fn spawn_with_world(&self, world: &mut World) -> Option<Vec<Entity>>;
+    fn spawn_with_world_child_builder(
+        &self,
+        child_builder: &mut WorldChildBuilder,
+    ) -> Option<Vec<Entity>>;
+}
 
-    fn world_spawn(&self, world: &mut World) -> Vec<Entity> {
-        if (self.condition)() {
-            self.child_nodes
-                .iter()
-                .flat_map(|c| c.world_spawn(world))
-                .collect()
-        } else {
-            Vec::new()
+macro_rules! impl_entity_node_spawn {
+    ($name:ident, $builder:ident, $builder_type: ident, $child_builder_func: ident) => {
+        fn $name(&self, $builder: &mut $builder_type) -> Entity {
+            let mut entity = $builder.spawn(self.bundle.clone());
+            if self.child_nodes.len() > 0 {
+                entity.with_children(|builder| {
+                    for child in &self.child_nodes {
+                        match child {
+                            AnyChimeraNode::Entity(c) => {
+                                c.$child_builder_func(builder);
+                            }
+                            AnyChimeraNode::If(c) => {
+                                c.$child_builder_func(builder);
+                            }
+                        }
+                    }
+                });
+            }
+            entity.id()
         }
-    }
+    };
+}
 
-    fn world_child_spawn(&self, builder: &mut WorldChildBuilder) -> Vec<Entity> {
-        if (self.condition)() {
-            self.child_nodes
-                .iter()
-                .flat_map(|c| c.world_child_spawn(builder))
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
+impl<T: Bundle + Clone> AnyEntityNode for EntityNode<T> {
+    impl_entity_node_spawn!(spawn, commands, Commands, spawn_with_child_builder);
+    impl_entity_node_spawn!(
+        spawn_with_child_builder,
+        child_builder,
+        ChildBuilder,
+        spawn_with_child_builder
+    );
+    impl_entity_node_spawn!(
+        spawn_with_world,
+        world,
+        World,
+        spawn_with_world_child_builder
+    );
+    impl_entity_node_spawn!(
+        spawn_with_world_child_builder,
+        world,
+        WorldChildBuilder,
+        spawn_with_world_child_builder
+    );
+}
 
-    fn child_spawn(&self, builder: &mut ChildBuilder) -> Vec<Entity> {
-        if (self.condition)() {
-            self.child_nodes
-                .iter()
-                .flat_map(|c| c.child_spawn(builder))
-                .collect()
-        } else {
-            Vec::new()
+macro_rules! impl_if_node_spawn {
+    ($name:ident, $builder:ident, $builder_type: ident) => {
+        fn $name(&self, $builder: &mut $builder_type) -> Option<Vec<Entity>> {
+            if (self.condition)() {
+                Some(
+                    self.child_nodes
+                        .iter()
+                        .flat_map(|c| match c {
+                            AnyChimeraNode::Entity(c) => vec![c.$name($builder)],
+                            AnyChimeraNode::If(c) => c.$name($builder).unwrap_or_default(),
+                        })
+                        .collect(),
+                )
+            } else {
+                None
+            }
         }
-    }
+    };
+}
+
+impl<F: Fn() -> bool> AnyIfNode for IfNode<F> {
+    impl_if_node_spawn!(spawn, commands, Commands);
+    impl_if_node_spawn!(spawn_with_child_builder, child_builder, ChildBuilder);
+    impl_if_node_spawn!(spawn_with_world, world, World);
+    impl_if_node_spawn!(
+        spawn_with_world_child_builder,
+        child_builder,
+        WorldChildBuilder
+    );
 }
