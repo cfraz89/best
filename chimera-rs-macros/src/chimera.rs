@@ -73,7 +73,7 @@ fn parse_punct(input: &TokenTree, punct: char) -> Result<(), ParseError> {
     }
 }
 
-/// Parse an entity node, which takes the form <component1 component2> { children...} or "text"
+/// Parse an entity node, which takes the form <tag component1 component2>child</tag> or "text"
 fn parse_entity(iter: &mut Peekable<IntoIter>) -> Result<Option<ChimeraMacroNode>, ParseError> {
     let token: Result<TokenTree, ParseError>;
     token = take_token(iter, "<components>, #if, or text string".to_string());
